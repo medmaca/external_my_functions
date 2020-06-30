@@ -21,6 +21,29 @@ nodeHeights = function (tree, ...)
     return(matrix(nh[tree$edge], ncol = 2L) + ROOT)
 }
 
+nodeheight=function (tree, node, ...) 
+{
+  if (hasArg(root.edge)) 
+    root.edge <- list(...)$root.edge
+  else root.edge <- FALSE
+  if (root.edge) 
+    ROOT <- if (!is.null(tree$root.edge)) 
+      tree$root.edge
+  else 0
+  else ROOT <- 0
+  if (!inherits(tree, "phylo")) 
+    stop("tree should be an object of class \"phylo\".")
+  if (node == (Ntip(tree) + 1)) 
+    h <- 0
+  else {
+    a <- setdiff(c(getAncestors(tree, node), node), Ntip(tree) + 
+                   1)
+    h <- sum(tree$edge.length[sapply(a, function(x, e) which(e == 
+                                                               x), e = tree$edge[, 2])])
+  }
+  h + ROOT
+}
+
 getTips = function(tree,node) {
   require(ape)
   if(node <= length(tree$tip.label)) {
