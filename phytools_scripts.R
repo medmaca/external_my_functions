@@ -44,6 +44,28 @@ nodeheight=function (tree, node, ...)
   h + ROOT
 }
 
+getAncestors=function (tree, node, type = c("all", "parent")) 
+{
+  if (!inherits(tree, "phylo")) 
+    stop("tree should be an object of class \"phylo\".")
+  type <- type[1]
+  if (type == "all") {
+    aa <- vector()
+    rt <- Ntip(tree) + 1
+    currnode <- node
+    while (currnode != rt) {
+      currnode <- getAncestors(tree, currnode, "parent")
+      aa <- c(aa, currnode)
+    }
+    return(aa)
+  }
+  else if (type == "parent") {
+    aa <- tree$edge[which(tree$edge[, 2] == node), 1]
+    return(aa)
+  }
+  else stop("do not recognize type")
+}
+
 getTips = function(tree,node) {
   require(ape)
   if(node <= length(tree$tip.label)) {
