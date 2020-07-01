@@ -589,7 +589,15 @@ plot_sharing_multiple=function(tree,details,matrices,node,sharing_cols=c("black"
   }
 }
 
-plot_mut_vaf_by_branch=function(tree,details,matrices,node,mut,colours=c("black","green","red"),cex=0.4,...) {
+plot_mut_vaf_by_branch=function(tree,
+                                details,
+                                matrices,
+                                node,
+                                mut,
+                                colours=c("black","green","red"),
+                                cex=0.4,
+                                #show_pval=FALSE,
+                                ...) {
   #Define the col.scale from the colours vector
   require(dichromat)
   colfunc = colorRampPalette(colours)
@@ -613,9 +621,9 @@ plot_mut_vaf_by_branch=function(tree,details,matrices,node,mut,colours=c("black"
   
   #Print the total depth for that branch at the node
   if(variant_reads>0|node %in% which(tree$tip.label %in% expected_samples))
-  text(info$x,info$yb,paste0(variant_reads,"/",total_reads),srt=90,cex = cex,col="black",font=2)
+    text(info$x,info$yb,paste0(variant_reads,"/",total_reads),srt=90,cex = cex,col="black",font=2)
   
   #Print the mutation name and log10(pvalue)
   text(1,1,pos=4,mut)
-  text(1,50,pos=4,paste0("Log10 p-value for allocated node:",round(log10(res$summary$pval[details$mut_ref==mut]))))
+  #if(show_pval&"pval"%in%colnames(details)){text(1,50,pos=4,paste0("Log10 p-value for allocated node:",round(log10(details$pval[details$mut_ref==mut]))))} 
 }
