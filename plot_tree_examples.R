@@ -627,3 +627,66 @@ plot_mut_vaf_by_branch=function(tree,
   text(1,1,pos=4,mut)
   #if(show_pval&"pval"%in%colnames(details)){text(1,50,pos=4,paste0("Log10 p-value for allocated node:",round(log10(details$pval[details$mut_ref==mut]))))} 
 }
+
+plot_MAV_mut=function(tree,
+                      details,
+                      matrices,
+                      node,
+                      lesion_node=NA,
+                      mut1,
+                      mut2=NULL,
+                      colours=c("dark gray","red","blue"),
+                      cex=0.4,
+                      #show_pval=FALSE,
+                      ...) {
+  #Define the col.scale from the colours vector
+  require(dichromat)
+  mut_colfunc = colorRampPalette(colours[-1])
+  mut_colscale = mut_colfunc(11)
+  
+  #Get the tips within the lesion node
+  if(!is.na(lesion_node)) {
+    expected_samples=getTips(tree,lesion_node)
+  }
+  
+  #Get the vaf
+  info=get_edge_info(tree,details,node=node)
+  samples=info$samples
+  mut1_reads=sum(matrices$NV[mut1,samples])
+  if(is.null(mut2)){mut2_reads=0}else{mut2_reads=sum(matrices$NV[mut2,samples])}
+  variant_reads=mut1_reads+mut2_reads
+  total_reads=variant_reads+(sum(matrices$NR[mut1,samples]) - mut1_reads)
+  wt_reads=total_reads-variant_reads
+  
+  if((mut1_reads+mut2_reads)!=0) {
+    if(is.null(mut2)) {
+      base_col=colours[2]
+    } else {
+      base_col=mut_colscale[1+round(10*mut1_reads/(mut1_reads+mut2_reads),digits=0)] #How red or blue should the "mut" element of the colour be
+    }
+  	final_colfunc=colorRampPalette(c("light gray",base_col))
+  	final_colscale=final_colfunc(101)
+  	branch_col=final_colscale[1+round(100*(mut1_reads+mut2_reads)/total_reads)] #Now how "concentrated" should the mut colour be
+  } else {
+  	branch_col="light gray"
+  }  
+  
+  #Plot the branches using the colour scale
+  if(length(tree$edge.length[tree$edge[,2]==node])>0){
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=branch_col,lend=1,...)
+  }
+  
+  #Print the total depth for that branch at the node
+  if(!is.na(lesion_node)){
+    if(node %in% which(tree$tip.label %in% expected_samples)) {
+      text(info$x,info$yb,paste0(variant_reads,"/",total_reads),srt=90,cex = cex,col="black",font=2)
+    }
+  }
+
+  #Print the mutation name
+  if(is.null(mut2)) {
+    text(1,1,pos=4,mut1)
+  } else {
+    text(1,1,pos=4,paste0(mut1,"/",strsplit(x=mut2,split="-")[[1]][4]))
+  }
+}
