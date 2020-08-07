@@ -121,7 +121,7 @@ plot_tree=function(tree,direction="down",cex.label=1,offset=0,b_do_not_plot=FALS
       tipcol=tree$tip.color
     }
     if(cex.label>0){
-      text(tree$tip.label,y =top-(coords$a1[idx.tip]+offset) ,x=coords$b1[idx.tip],cex = cex.label,srt=90,pos = 2,col=tipcol)
+      text(tree$tip.label,y =top-(coords$a1[idx.tip]+offset) ,x=coords$b1[idx.tip],cex = cex.label,srt=90,pos = 1,col=tipcol)
     }
     if(cex.terminal.dots>0){
       points(y =top-(coords$a1[idx.tip]) ,x=coords$b1[idx.tip],col=tipcol,cex=cex.terminal.dots,pch=19)
