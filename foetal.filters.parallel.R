@@ -524,4 +524,15 @@ vaf_density_plot_final=function(sample,tree,COMB_mats){
   plot(dens,xlim = c(0,1),main=sample)
   abline(v = dens$x[which.max(dens$y)])
   text(0.7, max(dens$y) - 0.2, paste("Peak VAF dens=",round(dens$x[which.max(dens$y)], digits = 2)),col="red",cex = 0.7)
-} 
+}
+
+split_vagrent_output = function(df,split_col,col_IDs = c("Gene","Transcript","RNA","CDS","Protein","Type","SO_codes")) {
+  col = df[[split_col]]
+  output = matrix(nrow = nrow(df), ncol = length(col_IDs))
+  for(i in 1:length(col_IDs)) {
+    output[,i] = str_split(col, pattern = "\\|", simplify = TRUE)[,i]
+  }
+  colnames(output) = col_IDs
+  output<-as.data.frame(output,stringsAsFactors=F)
+  return(output)
+}
