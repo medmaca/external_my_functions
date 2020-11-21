@@ -89,3 +89,44 @@ generate.diagnostic.plots <- function(tree) {
     plot_BNPR(tree.BNPR.bespoke, col = "red", main="Population trajectory: custom method", xlab = "Time", ylab = "Relative population size")
     
 }
+
+designUltra <- function(tree, sparse = TRUE) {
+  if (is.null(attr(tree, "order")) || attr(tree, "order") == "cladewise")
+    tree <- reorder(tree, "postorder")
+  leri <- allChildren(tree)
+  bp <- bip(tree)
+  n <- length(tree$tip.label)
+  l <- tree$Nnode
+  nodes <- integer(l)
+  k <- 1L
+  u <- numeric(n * (n - 1) / 2)
+  v <- numeric(n * (n - 1) / 2)
+  m <- 1L
+  for (i in seq_along(leri)) {
+    if (length(leri[[i]]) > 1) {
+      if (length(leri[[i]]) == 2) ind <- getIndex(bp[[leri[[i]][1] ]],
+                                                  bp[[leri[[i]][2] ]], n)
+      else {
+        ind <- NULL
+        le <- leri[[i]]
+        nl <- length(le)
+        for (j in 1:(nl - 1)) ind <- c(ind, getIndex(bp[[le[j] ]],
+                                                     unlist(bp[ le[(j + 1):nl] ]), n))
+      }
+      li <- length(ind)
+      v[m:(m + li - 1)] <- k
+      u[m:(m + li - 1)] <- ind
+      nodes[k] <- i
+      m <- m + li
+      k <- k + 1L
+    }
+  }
+  if (sparse) X <- sparseMatrix(i = u, j = v, x = 2L)
+  else {
+    X <- matrix(0L, n * (n - 1) / 2, l)
+    X[cbind(u, v)] <- 2L
+  }
+  colnames(X) <- nodes
+  attr(X, "nodes") <- nodes
+  X
+}
