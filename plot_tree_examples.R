@@ -185,12 +185,14 @@ add_vaf=function(tree,##<< enhanced phylo returned from plot_tree
   MTR=sum(df$mtr)
   DEP=sum(df$dep)
   min.mean.vaf=0.45
-  z=binom.test(MTR,DEP,alternative = "less",p=min.mean.vaf)
+  z1=binom.test(MTR,DEP,alternative = "less",p=min.mean.vaf)
   z2=binom.test(MTR,DEP,alternative = "greater",p=0.05)
-  z$p.value=max(z$p.value,z2$p.value)
+  max.p.value=max(z1$p.value,z2$p.value)
   txt=gsub("^0\\.",".",sprintf("%3.2f",MTR/DEP))
-  if(z$p.value<0.05){
-    if(z$p.value<0.05/dim(tree$edge)[1]){
+  if(z1$p.value>0.05 & z2$p.value<0.05) {
+    border.color="green"
+  } else if(max.p.value<0.05){
+    if(max.p.value<0.05/dim(tree$edge)[1]){
       border.color="red"
     }else{
       border.color="blue"
@@ -199,13 +201,14 @@ add_vaf=function(tree,##<< enhanced phylo returned from plot_tree
     border.color="darkgrey"
   }
   
+  
   rect(xleft=info$x-r,xright=info$x+r,ybottom=y[1]-width/2,ytop=y[N]+width/2,border=border.color,lwd=lwd.rect)
   if(border.color!="darkgrey"){
     text(txt,x=info$x,y=y[1]+0.3*(y[N]-y[1]),col="black",cex=0.6)
   }
   arrows(x0=info$x,y0=info$yb,y1=info$yt,lwd=0.5,col="black",length=0,lend=2)
   
-  df
+  #df
   
 }
 
@@ -402,7 +405,7 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
                            query.field,##<< Name of column in details to query against
                            query.allowed.df,##<< Values of query field which should be annotated. data.frame value,col,pch columns.
                            label.field,##<< Name of column in details specifying the label text.
-                           cex.label=1,
+                           cex.label=2,
                            b.add.label=TRUE,
                            b.add.marker=TRUE,
                            ... ##<< paremeters for points (not color)
@@ -424,7 +427,7 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
     arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col="red",lend=1,lwd=3,lty=1,...)
     if(b.add.label){
       #text(rep(info$x,N),y=info$yb+0.5*(info$yt-info$yb),labels = vlabels,pos = 2,offset = 0.25,cex=cex.label)
-      boxtext(info$x-1,info$yb+0.5*(info$yt-info$yb),col.bg="white",border.bg="black",padding = c(0.5, 0.2),labels = vlabels,pos=2,cex=cex.label)
+      boxtext(info$x-1,info$yb+0.5*(info$yt-info$yb),col.bg="white",border.bg="black",padding = c(0.5, 1),labels = vlabels,pos=2,cex=cex.label)
     }
   }
   list(node=node,value=query.value)

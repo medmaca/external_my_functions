@@ -502,7 +502,7 @@ get_early_nodes = function(tree,divisions=2) {
 #Function to calculate peak VAFs from sample mutations (after applying germline and beta-binomial filters) to screen for mixed colonies
 check_peak_vaf = function(sample, COMB_mats, filter_params) {
   colnames(COMB_mats$NV) <- gsub(pattern = "_MTR", replacement = "",x = colnames(COMB_mats$NV))
-  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > 0.1 ,sample])
+  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > 0.3 ,sample])
   return(dens$x[which.max(dens$y)])
 }
 
