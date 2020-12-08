@@ -479,7 +479,7 @@ dna_strings_from_genotype = function(genotype_mat) {
 
 #Function to create vcf files from the "mat" object
 create_vcf_files = function(mat, select_vector = NULL) {
-  if(is.null(select_vector)) {vcf_file = mat[,2:5]} else {vcf_file = mat[select_vector,2:5]}
+  if(is.null(select_vector)) {vcf_file = mat[,c("Chrom","Pos","Ref","Alt")]} else {vcf_file = mat[select_vector,c("Chrom","Pos","Ref","Alt")]}
   names(vcf_file) = c("#CHROM", "POS", "REF", "ALT")
   vcf_file$ID = vcf_file$QUAL = vcf_file$FILTER = vcf_file$INFO = "."
   vcf_file = vcf_file[,c(1,2,8,3,4,7,6,5)]
