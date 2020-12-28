@@ -526,6 +526,45 @@ vaf_density_plot_final=function(sample,tree,COMB_mats){
   text(0.7, max(dens$y) - 0.2, paste("Peak VAF dens=",round(dens$x[which.max(dens$y)], digits = 2)),col="red",cex = 0.7)
 }
 
+
+
+#Functions to import the cgpVAF output matrices neatly into R in the format that is used in my scripts
+import_cgpvaf_output=function(cgpvaf_output_file,ref_ID="PDv37is") {
+  mat<-read.delim(cgpvaf_output_file,stringsAsFactors = FALSE)
+  mat<- mat[,!grepl(ref_ID,colnames(mat))] #Remove the reference sample columns
+  NV<- mat[,grepl("_MTR", colnames(mat))]; NR <- mat[,grepl("_DEP",colnames(mat))]
+  colnames(NR)=colnames(NV)=gsub(pattern = "_MTR",replacement = "", colnames(NV))
+  mat$mut_ref=paste(mat$Chrom,mat$Pos,mat$Ref,mat$Alt,sep = "-")
+  mat<-mat[,c("Chrom","Pos","Ref","Alt","mut_ref")]
+  rownames(NV)=rownames(NR)=mat$mut_ref
+  combined_mats=list(mat,NV,NR); names(combined_mats) <-c("mat","NV","NR")
+  return(combined_mats)
+}
+
+import_cgpvaf_SNV_and_INDEL = function(SNV_output_file,INDEL_output_file=NULL) {
+  #Import cgpVAF snp output file for the single-cell colonies, create the mut_ref column, and extract the mut and dep cols
+  SNV_mats=import_cgpvaf_output(SNV_output_file)
+  SNV_mats$mat$Mut_type="SNV"
+  if(!is.null(INDEL_output_file)) {
+    INDEL_mats = import_cgpvaf_output(INDEL_output_file)
+    INDEL_mats$mat$Mut_type="INDEL"
+    
+    #Only include samples that are included in both SNV and INDEL cgpVAF output
+    samples_in_both=intersect(colnames(SNV_mats$NV),colnames(INDEL_mats$NV))
+    print(paste(length(samples_in_both),"samples in both SNV and INDEL cgpVAF output matrices, and will be combined"))
+    SNV_mats$NV<-SNV_mats$NV[,samples_in_both]
+    SNV_mats$NR<-SNV_mats$NR[,samples_in_both]
+    INDEL_mats$NV<-INDEL_mats$NV[,samples_in_both]
+    INDEL_mats$NR<-INDEL_mats$NR[,samples_in_both]
+
+    combined_mats=mapply(SNV_mats,INDEL_mats,FUN = rbind) #Bind the indel and snp matrices together
+    return(combined_mats)
+  } else {
+    return(SNV_mats)
+  }
+}
+
+#Function to split up the imported output from VAGRENT in a neat way
 split_vagrent_output = function(df,split_col,col_IDs = c("Gene","Transcript","RNA","CDS","Protein","Type","SO_codes")) {
   col = df[[split_col]]
   output = matrix(nrow = nrow(df), ncol = length(col_IDs))
@@ -536,3 +575,4 @@ split_vagrent_output = function(df,split_col,col_IDs = c("Gene","Transcript","RN
   output<-as.data.frame(output,stringsAsFactors=F)
   return(output)
 }
+

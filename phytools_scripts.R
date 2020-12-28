@@ -122,6 +122,7 @@ get_corrected_tree = function(tree, details, sensitivity_df, include_indels = TR
 
 get_mut_burden = function(tree) {
   mut_burden = nodeHeights(tree)[tree$edge[,2] %in% 1:length(tree$tip.label),2]
+  return(mut_burden)
 }
 
 get_mut_burden_stats = function(tree) {
@@ -130,3 +131,35 @@ get_mut_burden_stats = function(tree) {
   cat(paste("Range of mutation burden is", round(range(mut_burden)[1],digits = 1),"to",round(range(mut_burden)[2],digits = 1),"\n"))
   cat(paste("Standard deviation of mutation burden is", round(sd(mut_burden),digits = 1),"\n"))
 }
+
+#Function to calculate the absolute minimum number of clones by counting the number of times a parent node is shared, but
+#a daughter node is recipient only (this would give you the number of extant transplanted clones if had full phylogeny)
+get_minimum_clones=function(tree,donor_ID,recip_ID){
+  shared_node_test=function(tree,node,donor_ID,recip_ID) {
+    node_samples=getTips(tree,node)
+    n_donor=sum(grepl(donor_ID,node_samples))
+    n_recip=sum(grepl(recip_ID,node_samples))
+    sharing_info=ifelse(n_donor>0&n_recip>0,"shared",ifelse(n_donor>0,"donor","recipient")) 
+  }
+  N=dim(tree$edge)[1]
+  by_node=sapply(1:N,function(i) {
+    node=tree$edge[i,2]
+    sharing_info=shared_node_test(tree,node,donor_ID,recip_ID)
+    if(sharing_info=="shared") {
+      daughter_nodes=get_node_children(node,tree = tree)
+      evidence_of_clone=0
+      for(i in daughter_nodes) {
+        daughter_sharing=shared_node_test(tree,node=i,donor_ID,recip_ID)
+        if(daughter_sharing=="recipient") {
+          evidence_of_clone=sum(1,evidence_of_clone)
+        }
+      }
+    } else {
+      evidence_of_clone=0
+    }
+    return(evidence_of_clone)
+  })
+  total_clones=sum(unlist(by_node))
+  return(total_clones)
+}
+
