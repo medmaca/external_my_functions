@@ -408,6 +408,7 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
                            cex.label=2,
                            b.add.label=TRUE,
                            b.add.marker=TRUE,
+                           lty=1,
                            ... ##<< paremeters for points (not color)
 ){
   info=get_edge_info(tree,details,node)
@@ -424,7 +425,7 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
   N=length(idx)
   ##Vertical offset so that labels sit slightly above the markers.
   if(N>0){
-    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col="red",lend=1,lwd=3,lty=1,...)
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col="red",lend=1,lwd=3,lty=lty,...)
     if(b.add.label){
       #text(rep(info$x,N),y=info$yb+0.5*(info$yt-info$yb),labels = vlabels,pos = 2,offset = 0.25,cex=cex.label)
       boxtext(info$x-1,info$yb+0.5*(info$yt-info$yb),col.bg="white",border.bg="black",padding = c(0.5, 1),labels = vlabels,pos=2,cex=cex.label)
@@ -441,7 +442,8 @@ plot_tree_labels=function(tree,details,
                                                       col=c("red","black"),pch=c(17,18)
                                                       ),
                           label.field="GENE",
-                          cex.label=1){
+                          cex.label=1,
+                          lty=1){
   if(type=="label") {res=add_annotation(tree,
                      details,list(),
                      function(tree,details,matrices,node){
@@ -459,7 +461,8 @@ plot_tree_labels=function(tree,details,
                                                                   query.field =query.field,
                                                                   query.allowed.df = query.allowed.df,
                                                                   label.field = label.field,
-                                                                  cex.label =cex.label)})}
+                                                                  cex.label=cex.label,
+                                                                  lty=lty)})}
 }
 
 

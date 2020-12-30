@@ -241,7 +241,7 @@ get_max_vaf = function(COMB_mats) {
 
 #Removing columns with low coverage, or that are otherwise unwanted
 remove_low_coverage_samples = function(COMB_mats,
-                                       filter_params,
+                                       filter_params=NULL,
                                        min_sample_mean_cov,
                                        other_samples_to_remove = NULL,
                                        min_variant_reads_auto = 3,
@@ -258,15 +258,21 @@ remove_low_coverage_samples = function(COMB_mats,
     null_remove = rowSums(COMB_mats$NV >= min_variant_reads_auto|(COMB_mats$NV >= min_variant_reads_xy & COMB_mats$mat$Chrom %in% c("X","Y") & COMB_mats$gender == "male")) == 0
     cat(sum(null_remove),"mutations removed as no positives in any remaining samples.\n")
     COMB_mats = list_subset(COMB_mats, select_vector = !null_remove)
-    filter_params = filter_params[!null_remove,]
-    output = list(COMB_mats=COMB_mats,filter_params=filter_params)
-    return(output)
+    if(!is.null(filter_params)) {
+      filter_params = filter_params[!null_remove,]
+      output = list(COMB_mats=COMB_mats,filter_params=filter_params)
+    } else {
+      output=COMB_mats
+    }
   } else {
     cat("No samples removed\n")
-    output = list(COMB_mats=COMB_mats,filter_params=filter_params)
-    return(output)
+    if(!is.null(filter_params)) {
+      output = list(COMB_mats=COMB_mats,filter_params=filter_params)
+    } else {
+      output=COMB_mats
+    }
   }
-
+  return(output)
 }
 
 #Functions for filtering from the filter_params and COMB_mats object, setting the desired cut-offs
@@ -430,6 +436,7 @@ get_filtered_mut_set = function(input_set_ID,
                 pval_dp3= pval_dp3,
                 min_depth = min_depth,
                 min_pval_for_true_somatic = min_pval_for_true_somatic,
+                min_vaf = min_vaf,
                 min_variant_reads_SHARED = min_variant_reads_SHARED,
                 min_pval_for_true_somatic_SHARED = min_pval_for_true_somatic_SHARED,
                 min_vaf_SHARED=min_vaf_SHARED)
