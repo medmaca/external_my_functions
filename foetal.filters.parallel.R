@@ -583,3 +583,61 @@ split_vagrent_output = function(df,split_col,col_IDs = c("Gene","Transcript","RN
   return(output)
 }
 
+#Function to check for mutations that have been called as germline that are in fact absent in a clade
+#Run using: res=check_for_false_germline_calls(tree,COMB_mats = COMB_mats, filter_params=filter_params)
+
+check_for_false_germline_calls = function(tree,
+                                          COMB_mats,
+                                          filter_params,
+                                          max_clade_prop=0.1 #the cutoff size (proportion of total samples included in clade) to test the clade for absent germline mutations. At >10% the germline filter is unlikely to wrongly remove mutations.
+) {
+  #Pull out the root clades
+  get_root_clades=function(tree) {
+    tree=di2multi(tree)
+    ROOT=tree$edge[1,1]
+    clades=tree$edge[tree$edge[,1]==ROOT,2]
+    root_clade_samples=lapply(clades,function(node) return(getTips(tree,node)))
+    return(root_clade_samples)
+  }
+  
+  root_clades=get_root_clades(tree)
+  nsamp=length(tree$tip.label)
+  which_small=sapply(root_clades,length)<max_clade_prop*nsamp
+  root_clades[!which_small]<-NULL
+  
+  if(length(root_clades)>0) {
+    res<-lapply(root_clades,function(outlier_sample_group) {
+      print(paste("Testing outlier group:",paste(outlier_sample_group,collapse=" ")))
+      #Ensure all names are consistent
+      rownames(COMB_mats$NR)=rownames(COMB_mats$NV)=rownames(COMB_mats$PVal)<-COMB_mats$mat$mut_ref
+      colnames(COMB_mats$NR)=colnames(COMB_mats$PVal)=colnames(COMB_mats$NV)<-gsub("_MTR","",colnames(COMB_mats$NV))
+      
+      #Select mutations that were filtered by the germline filter
+      germline_filtered=rownames(filter_params)[log10(filter_params$germline_pval)>(-10)]
+      
+      #Aggregate counts across an individual outlier sample/ sample group
+      NR_outlier=apply(COMB_mats$NR[germline_filtered,outlier_sample_group,drop=F],1,sum)
+      NV_outlier=apply(COMB_mats$NV[germline_filtered,outlier_sample_group,drop=F],1,sum)
+      
+      outlier_pvals=mapply(FUN=function(NV,NR) {if(NR==0){return(1)}else{binom.test(NV,NR,alternative="less")$p.value}},NV=NV_outlier,NR=NR_outlier)
+      hist(log10(outlier_pvals),breaks=50,main="Unadjusted p-values for mutations being present in outlier group") #Review the p-value histogram - any clear low outliers?
+      
+      #Test for germline filtered mutations that are likely to be absent (with Bon-Ferroni correction for multiple testing)
+      any_convincing=sum(outlier_pvals<0.05/length(germline_filtered) & NV_outlier==0) #Check for any absent, with multiple testing (B-F) correction
+      
+      if(any_convincing) {
+        print(paste(germline_filtered[outlier_pvals<0.05/length(germline_filtered) & NV_outlier==0],"is convincingly absent in this group"))
+        return(germline_filtered[outlier_pvals<0.05/length(germline_filtered) & NV_outlier==0])
+      } else {
+        print("There are no mutations called as germline that are robustly absent in this outlier group, though this would relies on adequate coverage")
+        return(NULL)
+      }
+    })
+    return(res)
+  } else {
+    print(paste0("There are no clades from the root that include <",max_clade_prop*100,"% of samples"))
+    return(NULL)
+  }
+}
+
+

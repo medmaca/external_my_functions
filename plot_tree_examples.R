@@ -696,3 +696,34 @@ plot_MAV_mut=function(tree,
     text(1,1,pos=4,paste0(mut1,"/",strsplit(x=mut2,split="-")[[1]][4]))
   }
 }
+
+
+###FUNCTIONS TO GO WITH THE APE "PLOT.PHYLO" FUNCTION
+
+highlight_groups=function(tree,group1,group2,cols=c("#17698E","#17A258")) {
+  any_group=c(group1,group2) #make combined list of samples assigned to at least one group
+  
+  #Iterate through all the nodes & work if (1) all the tips are in group1 (2) all are in group2 (3) mixture of both
+  col_vec=sapply(tree$edge[,2],function(node) {
+    node_daughters=getTips(tree,node)
+    if(any(node_daughters%in%any_group)) {
+      node_daughters<-node_daughters[node_daughters%in%any_group] #only include those tips that are assigned to a specific group
+      if(all(node_daughters%in%group1)) {
+        col<-cols[1]
+      } else if(all(node_daughters%in%group2)) {
+        col<-cols[2]
+      } else {
+        col<-"black" #If has tips in both groups, colour black
+      }
+    } else {
+      col<-"lightgrey"
+    }
+  })
+  return(col_vec)
+}
+
+highlight_samples=function(tree,samples) {
+  tips=which(tree$tip.label%in%samples)
+  edge_cols=sapply(tree$edge[,2],function(node) ifelse(node%in%tips,"red","black"))
+  return(edge_cols)
+}
