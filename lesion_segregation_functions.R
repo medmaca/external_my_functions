@@ -144,7 +144,7 @@ get_multi_allelic_variant_list=function(details) {
           if(nchar(details_by_chrom$Ref[j])==1) {
             pos=details_by_chrom$Pos[j]
           } else {
-            pos=details_by_chrom$Pos[j]:(details_by_chrom$Pos[j]+nchar(details_by_chrom$Ref[j])-1)
+            pos=details_by_chrom$Pos[j]:(as.numeric(details_by_chrom$Pos[j])+nchar(details_by_chrom$Ref[j])-1)
           }
           if(length(intersect(pos,Pos))>0) {
             return(T)
