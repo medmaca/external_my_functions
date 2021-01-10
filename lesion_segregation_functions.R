@@ -151,9 +151,9 @@ get_multi_allelic_variant_list=function(details) {
         }
         out=sapply((i+1):min(i+5,nrow(details_by_chrom)),function(j) {
           if(nchar(details_by_chrom$Ref[j])==1) {
-            pos=details_by_chrom$Pos[j]
+            pos=as.numeric(details_by_chrom$Pos[j])
           } else {
-            pos=details_by_chrom$Pos[j]:(as.numeric(details_by_chrom$Pos[j])+nchar(details_by_chrom$Ref[j])-1)
+            pos=as.numeric(details_by_chrom$Pos[j]):(as.numeric(details_by_chrom$Pos[j])+nchar(details_by_chrom$Ref[j])-1)
           }
           if(length(intersect(pos,Pos))>0) {
             return(T)
