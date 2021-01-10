@@ -74,6 +74,15 @@ reclassify_MNVs=function(COMB_mats,region_size=2,genomeFile) {
     return(out_list)
   })
   
+  out_list_by_chrom=lapply(out_list_by_chrom, function(list) {
+    i=1
+    while(i<length(list)){
+      muts<-list[[i]]
+      if(any(list[[i+1]]%in%muts)) {list[[i]]<-unique(c(list[[i]],list[[i+1]]));list[[i+1]]<-NULL} else {i<-i+1}
+    }
+    return(list)
+  })
+  
   #Combine the chromosomes into one list
   out_list=unlist(out_list_by_chrom,recursive=F)
   
