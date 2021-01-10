@@ -690,10 +690,12 @@ plot_MAV_mut=function(tree,
   }
 
   #Print the mutation name
-  if(is.null(mut2)) {
-    text(1,1,pos=4,mut1)
-  } else {
-    text(1,1,pos=4,paste0(mut1,"/",strsplit(x=mut2,split="-")[[1]][4]))
+  if(node==1) { #Do for node==1 so that only prints the name once
+    if(is.null(mut2)) {
+      text(1,1,pos=4,mut1)
+    } else {
+      text(1,1,pos=4,paste0(mut1,"/",strsplit(x=mut2,split="-")[[1]][4]))
+    }
   }
 }
 
