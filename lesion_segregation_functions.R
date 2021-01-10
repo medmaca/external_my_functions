@@ -136,6 +136,8 @@ reclassify_MNVs=function(COMB_mats,region_size=2,genomeFile) {
 #Assesses for overlapping positions of reference
 get_multi_allelic_variant_list=function(details) {
   Chroms=c(1:22,"X","Y")
+  details$Ref=as.character(details$Ref)
+  details$Alt=as.character(details$Alt)
   out_list_by_chrom=lapply(Chroms,function(Chrom) {
     if(sum(details$Chrom==Chrom)>1) {
       print(paste("Analysing chromosome",Chrom))
