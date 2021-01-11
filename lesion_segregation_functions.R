@@ -60,8 +60,8 @@ reclassify_MNVs=function(COMB_mats,region_size=2,genomeFile) {
     out_list=lapply(1:nrow(details_by_chrom),function(i) {
       Pos=as.numeric(details_by_chrom$Pos[i])
       node=details_by_chrom$node[i]
-      near_muts=which(details_by_chrom$Pos>Pos&
-                        details_by_chrom$Pos<=(Pos+region_size)&
+      near_muts=which(as.numeric(details_by_chrom$Pos)>Pos&
+                        as.numeric(details_by_chrom$Pos)<=(Pos+region_size)&
                         details_by_chrom$node==node)
       near_muts<-near_muts[near_muts!=i]
       if(length(near_muts)==0) {
