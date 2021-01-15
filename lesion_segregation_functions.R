@@ -10,7 +10,7 @@ get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor 
 
 #Define the "get_node_types" function required for following the lesion journey in the case of PVVs
 #It uses the mutation dataframe ("mut_df") to work out whether daughter branches of a node are (a) a mutant allele (b) wild-type or (c) mixed
-get_node_types=function(lesion_children,mut_df) {
+get_node_types=function(lesion_children,mut_df,tree) {
   types=sapply(lesion_children, function(node) {
     nodes=c(node,get_all_node_children(node,tree))
     if(all(!mut_df$neg_test[mut_df$clades%in%nodes])){
@@ -25,7 +25,7 @@ get_node_types=function(lesion_children,mut_df) {
 }
 
 #As above, but can incorporate two alternative mutant alleles, therefore suitable for MAVs
-get_MAV_node_types=function(lesion_children,mut_df) {
+get_MAV_node_types=function(lesion_children,mut_df,tree) {
   types=sapply(lesion_children, function(node) {
     nodes=c(node,get_all_node_children(node,tree))
     if(all(!mut_df$neg_test[mut_df$clades%in%nodes])&any(mut_df$mut1_pos_test[mut_df$clades%in%nodes])&!any(mut_df$mut2_pos_test[mut_df$clades%in%nodes])){
