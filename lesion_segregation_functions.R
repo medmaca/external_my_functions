@@ -30,7 +30,7 @@ get_MAV_node_types=function(lesion_children,mut_df,tree) {
     nodes=c(node,get_all_node_children(node,tree))
     if(all(!mut_df$neg_test[mut_df$clades%in%nodes])&any(mut_df$mut1_pos_test[mut_df$clades%in%nodes])&!any(mut_df$mut2_pos_test[mut_df$clades%in%nodes])){
       return("pure_mut1")
-    } else if(all(!mut_df$neg_test[mut_df$clades%in%nodes])&any(mut_df$mut2_pos_test[mut_df$clades%in%nodes])&!any(mut_df$mut1_pos_test[mut_df$clades%in%nodes])){
+    } else if((sum(!mut_df$neg_test[mut_df$clades%in%nodes])/length(!mut_df$neg_test[mut_df$clades%in%nodes])>0.98)&any(mut_df$mut2_pos_test[mut_df$clades%in%nodes])&!any(mut_df$mut1_pos_test[mut_df$clades%in%nodes])){
       return("pure_mut2")
     }else if(all(!mut_df$mut1_pos_test[mut_df$clades%in%nodes]) & all(!mut_df$mut2_pos_test[mut_df$clades%in%nodes])) {
       return("pure_negative")
@@ -175,4 +175,339 @@ get_multi_allelic_variant_list=function(details) {
   out_list=unlist(out_list_by_chrom,recursive=F)
 }
 
+#Find the latest possible timing of the acquisition of the lesion
+find_PVV_lesion_node=function(mut,allocated_node,pos_test,neg_test,tree,matrices) {
+  
+  #Define the get_ancestor_node function
+  get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor (i.e. the direct parent) use degree=1.  Use higher degrees to go back several generations.
+    curr<-node
+    for(i in 1:degree){
+      curr=tree$edge[which(tree$edge[,2]==curr),1]
+      if(curr==(1+length(tree$tip.label))) {stop(return(curr))}
+    }
+    return(curr)
+  }
+  
+  mut_df=create_mut_df(mut=mut1,tree=tree,matrices=matrices)
+  
+  if(filter_output_df$pos_test[filter_output_df$mut==mut]) {
+    #if the negative sub-clade is within the allocated node, then "pos_test" will be true and "allocated_node" is the "initial_lesion_node"
+    initial_lesion_node<-allocated_node
+  } else if (filter_output_df$neg_test[filter_output_df$mut==mut]){
+    #If there is a positive clade outside the allocated node, then "neg_test" will be true.  In this case need to find the positive clade.
+    #Do this be iteratively going from the allocated node to its ancestral node and looking for the ancestral node that contains ALL positive clades in the tree
+    for(j in 1:3) {
+      ancestor=get_ancestor_node(allocated_node,tree,degree=j)
+      ancestor_tips=getTips(tree,ancestor)
+      #Look at clades that don't have any of the samples in "ancestor_tips". If this ancestor is the "initial_lesion_node", none will meet the "pos_test".
+      if(!any(mut_df$pos_test[unlist(lapply(all_clade_samples, function(samples) !any(samples %in% ancestor_tips)))])) {
+        break #Once this criteria is met, do not need to look back any further
+      }
+    }
+    initial_lesion_node<-ancestor #The initial lesion node is therefore the most recent "ancestor" from the previous loop
+  }
+  return(initial_lesion_node)
+}
+
+find_MAV_lesion_node=function(node1,node2,tree) {
+  if(node1==node2) {
+    stop(return(return(list(initial_lesion_node=NA,Filter="FAIL",Class="FAIL"))))
+  } else {
+    #get the ancestral nodes
+    ancestor_1=tree$edge[tree$edge[,2]==node1,1]
+    ancestor_2=tree$edge[tree$edge[,2]==node2,1]
+    ancestors=c(ancestor_1,ancestor_2)
+    ancestor_heights=sapply(ancestors,function(node) nodeheight(tree,node))
+    
+    if(ancestor_1==ancestor_2){
+      Filter="PASS"
+      Class="simple"
+      initial_lesion_node=get_ancestor_node(node = node1,tree = tree)
+    } else if(ancestor_1%in%get_all_node_children(ancestor_2,tree)|ancestor_2%in%get_all_node_children(ancestor_1,tree)){
+      Filter="PASS"
+      Class="removed"
+      if(which.min(ancestor_heights)==1 & node2%in%get_all_node_children(node1,tree)) {
+        initial_lesion_node<-node1
+      } else if(which.min(ancestor_heights)==2 & node1%in%get_all_node_children(node2,tree)){
+        initial_lesion_node<-node2
+      } else {
+        initial_lesion_node<-ancestors[which.min(ancestor_heights)]
+      }
+    } else {
+      return(return(list(initial_lesion_node=NA,Filter="FAIL",Class="FAIL")))
+    }
+  }
+  return(list(initial_lesion_node=initial_lesion_node,Filter=Filter,Class=Class))
+}
+
+#This function extracts a straight-forward phasing info df from the julia algorithm output
+extract_phasing_info=function(list,Ref,Alt) {
+  phasing_df=Reduce(rbind,list)
+  #basects_df=Reduce(rbind,lapply(list,function(list) return(list[[2]])))
+  if(nrow(phasing_df)==0) {stop(return(NA))}
+  phasing_df$mut_base=sapply(strsplit(phasing_df$Mutation_allele,split = "="),function(x) x[2])
+  phasing_df$snp_base=sapply(strsplit(phasing_df$SNP_allele,split = "="),function(x) x[2])
+  
+  SNP_sites=sort(unique(str_split(phasing_df$SNP_allele,pattern = "=",simplify = T)[,1]))
+  
+  phasing_by_SNP_list=lapply(SNP_sites,function(SNP_site) {
+    phasing_df_snp<-phasing_df[grepl(SNP_site,phasing_df$SNP_allele),]
+    
+    #Summarise mut allele phasing
+    if(any(phasing_df_snp$mut_base==Alt)) {
+      alt_phasing=table(phasing_df_snp$snp_base[phasing_df_snp$mut_base==Alt])
+      alt_phases_with_base=names(alt_phasing)[which.max(alt_phasing)]
+      n_alt_reads_supporting=alt_phasing[alt_phases_with_base]
+      n_alt_reads_against=(sum(alt_phasing)-n_alt_reads_supporting)
+    } else {
+      alt_phasing=NA
+      alt_phases_with_base=NA
+      n_alt_reads_supporting=0
+      n_alt_reads_against=0
+    }
+    
+    #Summarise wt allele phasing
+    if(any(phasing_df_snp$mut_base==Ref)){
+      ref_phasing=table(phasing_df_snp$snp_base[phasing_df_snp$mut_base==Ref])
+      ref_phases_with_base=names(ref_phasing)[which.max(ref_phasing)]
+      n_ref_reads_supporting=ref_phasing[ref_phases_with_base]
+      n_ref_reads_against=(sum(ref_phasing)-n_ref_reads_supporting)
+    } else {
+      ref_phasing=NA
+      ref_phases_with_base=NA
+      n_ref_reads_supporting=0
+      n_ref_reads_against=0
+    }
+    
+    return(data.frame(SNP_site=SNP_site,
+                      alt_phases_with_base=alt_phases_with_base,
+                      n_alt_reads_supporting=n_alt_reads_supporting,
+                      n_alt_reads_against=n_alt_reads_against,
+                      ref_phases_with_base=ref_phases_with_base,
+                      n_ref_reads_supporting=n_ref_reads_supporting,
+                      n_ref_reads_against=n_ref_reads_against
+    )
+    )
+  })
+  phasing_by_SNP_df=Reduce(rbind,phasing_by_SNP_list)
+  return(phasing_by_SNP_df)
+}
+
+#Function will look in the supplied output_dir to see if phasing output for given sample/Chrom/Pos already exists, if not will run the .jl script. Imports the data.
+#Run example: get_phasing_list(samples=positive_samples1,Chrom=Chrom,Pos=Pos,project=project,output_dir = phasing_output_dir,ref_sample_set = Ref_sample_set)
+get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F) {
+  wd<-getwd()
+  setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
+  if(is.numeric(project)) {
+    phasing_list=lapply(samples,function(sample) {
+      phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
+      basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
+      if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
+      if(!file.exists(phasing_output_file)) {
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        system(command)
+      } else if(verbose) {
+        print("Existing phasing files found in specified output directory")
+      }
+      phasing=read.table(phasing_output_file,header = T)
+      return(phasing)
+    })
+  } else if(is.data.frame(project)) {
+    phasing_list=lapply(samples,function(sample) {
+      phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
+      basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
+      if(verbose) {print(paste("Looking in sample",sample))}
+      sample_project=project$project[project$sample==sample]
+      set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",")
+      if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
+      
+      if(!file.exists(phasing_output_file)) {
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        system(command)
+      } else if(verbose) {
+        print("Existing phasing files found in specified output directory")
+      }
+      phasing=read.table(phasing_output_file,header = T)
+      return(phasing)
+    })
+  }
+  
+  setwd(wd)
+  return(phasing_list)
+}
+
+get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F) {
+  wd<-getwd()
+  setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
+  if(is.numeric(project)) {
+    basects_list=lapply(samples,function(sample) {
+      phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
+      basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
+      if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
+      if(!file.exists(phasing_output_file)) {
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        system(command)
+      } else if(verbose) {
+        print("Existing phasing files found in specified output directory")
+      }
+      basects=read.table(basects_output_file,header = T)
+      return(basects)
+    })
+  } else if(is.data.frame(project)) {
+    basects_list=lapply(samples,function(sample) {
+      phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
+      basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
+      if(verbose) {print(paste("Looking in sample",sample))}
+      sample_project=project$project[project$sample==sample]
+      set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",") #Define a random set of samples (in the same project) from the tree used for finding heterozgous SNPs in the .jl phasing script
+      if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
+      if(!file.exists(phasing_output_file)) {
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        system(command)
+      } else if(verbose) {
+        print("Existing phasing files found in specified output directory")
+      }
+      basects=read.table(basects_output_file,header = T)
+      return(basects)
+    })
+  }
+  
+  setwd(wd)
+  return(basects_list)
+}
+
+check_matching_phasing=function(phasing_info1,phasing_info2) {
+  if(any(sapply(c(phasing_info1,phasing_info2),is.logical))) {
+    result<-"Unable to confirm phasing"
+  } else {
+    comb_df=inner_join(phasing_info1,phasing_info2,by="SNP_site")
+    
+    #Test for either alt matching alt, or ref matching ref for any individual SNP
+    Matching_alt_phasing<-any(comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y)&all(sapply(comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y,function(x) is.na(x)|x))
+    Matching_ref_phasing<-any(comb_df$ref_phases_with_base.x==comb_df$ref_phases_with_base.y)&all(sapply(comb_df$ref_phases_with_base.x==comb_df$ref_phases_with_base.y,function(x) is.na(x)|x))
+    
+    #Alternatively, confirm MISMATCH between one confirmed ref and the other confirmed alt
+    Non_matching_alt_ref_phasing<-any(comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.y)&all(sapply(comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.y,function(x) is.na(x)|x))
+    Non_matching_ref_alt_phasing<-any(comb_df$ref_phases_with_base.x!=comb_df$alt_phases_with_base.y)&all(sapply(comb_df$ref_phases_with_base.x!=comb_df$alt_phases_with_base.y,function(x) is.na(x)|x))
+    
+    results_vec=c(Matching_alt_phasing,Matching_ref_phasing,Non_matching_alt_ref_phasing,Non_matching_ref_alt_phasing)
+    
+    if(any(results_vec)&!any(!results_vec)){
+      result<-"Same phasing confirmed"
+    } else if(all(sapply(results_vec,is.na))) {
+      result<-"Unable to confirm phasing"
+    } else {
+      result<-"Non-matching phasing confirmed"
+    }
+  }
+  return(result)
+}
+
+check_for_both_alleles_confirming_ref=function(phasing_info) {
+  if(is.logical(phasing_info)) {
+    result<-"No nearby heterozygous SNPs to confirm"
+  } else if(sum(phasing_info$n_ref_reads_against)>0 & sum(phasing_info$n_ref_reads_against)>(sum(phasing_info$n_ref_reads_supporting)*0.2)){
+    result<-"Both alleles confirmed with reference allele"
+  } else {
+    result<-"May have biased allele sequencing or LOH - suggest further confirmation"
+  }
+  return(result)
+}
+
+create_mut_df=function(mut,tree,matrices) {
+  #Create reference set of sample sets that form clades - used in assessing PVVs and MAVs
+  all_clades=unique(tree$edge[,2])
+  all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
+  
+  mut_df<-Reduce(rbind,mapply(function(samples,clade) {return(data.frame(NV=sum(matrices$NV[mut,samples]),NR=sum(matrices$NR[mut,samples]),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
+  mut_df$pos_test<-apply(mut_df,1,function(x){x[2]>=8 & (x[1]/x[2])>=0.3})
+  mut_df$neg_test<-apply(mut_df,1,function(x){x[1]==0 & (x[2])>=10})
+  return(mut_df)
+}
+
+create_MAV_df=function(mut1,mut2,tree,matrices) {
+  #Create reference set of sample sets that form clades - used in assessing PVVs and MAVs
+  all_clades=unique(tree$edge[,2])
+  all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
+  
+  MAV_df<-Reduce(rbind,mapply(function(samples,clade) {return(data.frame(NV1=sum(matrices$NV[mut1,samples]),NV2=sum(matrices$NV[mut2,samples]),NR=sum(matrices$NR[mut1,samples]),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
+  MAV_df$mut1_pos_test<-apply(MAV_df,1,function(x){x[3]>=8 & (x[1]/x[3])>=0.3})
+  MAV_df$mut2_pos_test<-apply(MAV_df,1,function(x){x[3]>=8 & (x[2]/x[3])>=0.3})
+  MAV_df$neg_test<-apply(MAV_df,1,function(x){sum(x[1:2])==0 & (x[3])>=10})
+  
+  return(MAV_df)
+}
+
+get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
+  if(is.null(mut2)) {test_type="PVV"} else {test_type="MAV"}
+  print(paste("Testing",test_type))
+  
+  if(test_type=="PVV"){mut_df=create_mut_df(mut=mut1,tree=tree,matrices=matrices)} else {mut_df=create_MAV_df(mut1=mut1,mut2=mut2,tree=tree,matrices=matrices)}
+  
+  #1. get daughter nodes of lesion node
+  lesion_children=get_node_children(lesion_node,tree=tree)
+  if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
+    print("Removing polytomy")
+    keep_children=sapply(lesion_children, function(node) {nodes=get_all_node_children(node,tree=tree); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
+    lesion_children<-lesion_children[keep_children]
+  }
+  
+  #Test these daughter nodes to see if they are "pure positive", "pure negative" or "mixed"
+  if(test_type=="PVV") {types=get_node_types(lesion_children,mut_df,tree=tree)} else {types=get_MAV_node_types(lesion_children,mut_df,tree=tree)}
+  if(sum(types=="mixed")>1) {stop(return("More than one mixed subclade identified - indicative that not caused by a persistent DNA lesion"))}
+  names(lesion_children)<-types
+  pure_subclades=lesion_children[names(lesion_children)!="mixed"]
+  
+  for(k in 1:5) {
+    lesion_node=lesion_children["mixed"] #Get the new lesion node for this iteration (the "mixed" descendant of the previous lesion node)
+    lesion_children=get_node_children(lesion_node,tree=tree)
+    if(test_type=="PVV") {types=get_node_types(lesion_children,mut_df,tree=tree)} else {types=get_MAV_node_types(lesion_children,mut_df,tree=tree)}
+    if(sum(types=="mixed")>1) {stop(return("More than one mixed subclade identified - indicative that not caused by a persistent DNA lesion"))}
+    names(lesion_children)=types
+    if(!any(types=="mixed")) {
+      pure_subclades=c(pure_subclades,lesion_children)
+      break
+    } else {
+      lesion_node=lesion_children["mixed"]
+      pure_subclades=c(pure_subclades,lesion_children[types!="mixed"])
+    }
+  }
+  return(pure_subclades)
+}
+
+get_file_paths_and_project=function(dataset,Sample_ID) {
+  if(dataset=="MSC_fetal") {
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Tree_",Sample_ID,".tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Filtered_mut_set_annotated_",Sample_ID)
+    project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/MSC_BMT/Samples_project_reference.csv",header=T)
+    project<-project[,c("Sample","Project")]
+    colnames(project)<-c("sample","project")
+  } else if(dataset=="EM") {
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_standard_rho01.tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_standard_rho01")
+    project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/EM/Samples_project_ref.csv",header=T)
+    project_ref<-project_ref[,c(1,3)]
+    colnames(project_ref)<-c("sample","project")
+    sample=substr(Sample_ID,1,5)
+    project=as.numeric(project_ref$project[project_ref$sample==sample])
+  } else if(dataset=="KY") {
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"_rmix_consense_tree_no_branch_lengths_1811.tree") 
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Filtered_muts_",Sample_ID)
+    project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/KY/Samples_project_ref_KY.csv",header=T)
+    project=as.numeric(project_ref$project[project_ref$sample==Sample_ID])
+  } else if(dataset=="MSC_BMT") {
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_pval_post_mix.tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_pval_post_mix")
+    project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/MSC_BMT/Samples_project_reference.csv",header=T)
+    project<-project[,c("Sample","Project")]
+    colnames(project)<-c("sample","project")
+  } else if(dataset=="PR") {
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"/snp_tree_with_branch_length_polytomised.tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Filtered_muts_",Sample_ID)
+    project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/PR/Samples_project_ref_PR.csv",header=T)
+    project<-project[,c("Sample","Project")]
+    colnames(project)<-c("sample","project")
+  }
+  return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project))
+}
 
