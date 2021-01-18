@@ -1,3 +1,5 @@
+##SET OF FUNCTIONS DESIGNED FOR THE "Lesion_segregation_mutation_summaries.R" SCRIPT AND THE ANALYSIS
+
 #This function is required in the filtering function
 get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor (i.e. the direct parent) use degree=1.  Use higher degrees to go back several generations.
   curr<-node
@@ -438,6 +440,7 @@ create_MAV_df=function(mut1,mut2,tree,matrices) {
   return(MAV_df)
 }
 
+#Function to determine the "lesion path" and the fixed or "pure" subclades thrown off by the lesion
 get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   if(is.null(mut2)) {test_type="PVV"} else {test_type="MAV"}
   print(paste("Testing",test_type))
@@ -511,3 +514,64 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
   return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project))
 }
 
+#Combining the MAVs into a consensus Ref and Alt covering the same positions is complicated by the fact that they may report slightly different sequences (e.g. if one is an SNV and the other an MNV)
+#This function is to define a reference set
+establish_ref_and_alt=function(Ref1,Ref2,Alt1,Alt2,Pos1,Pos2) {
+  if(Ref1==Ref2) {
+    Ref<-Ref1 
+  } else if(Pos1!=Pos2){
+    Ref_vec1=as.vector(str_split(Ref1,"",simplify=T))
+    names(Ref_vec1)=seq_along(Ref_vec1)+Pos1-1
+    
+    Ref_vec2=as.vector(str_split(Ref2,"",simplify=T))
+    names(Ref_vec2)=seq_along(Ref_vec2)+Pos2-1
+    
+    Ref_vec<-c(Ref_vec1,Ref_vec2[!names(Ref_vec2)%in%names(Ref_vec1)])
+    Ref<-paste0(Ref_vec,collapse="")
+    
+    #Do the same for the Alt1 vector
+    Alt1_vec=as.vector(str_split(Alt1,"",simplify=T))
+    names(Alt1_vec)=seq_along(Alt1_vec)+Pos1-1
+    Alt1_new_vec=c(Alt1_vec,Ref_vec[!names(Ref_vec)%in%names(Ref_vec1)])
+    Alt1<-paste0(Alt1_new_vec,collapse="")
+    
+    #Do the same for the Alt1 vector
+    Alt2_vec=as.vector(str_split(Alt2,"",simplify=T))
+    names(Alt2_vec)=seq_along(Alt2_vec)+Pos2-1
+    Alt2_new_vec=c(Ref_vec[!names(Ref_vec)%in%names(Ref_vec2)],Alt2_vec)
+    Alt2<-paste0(Alt2_new_vec,collapse="")
+    
+  } else if(nchar(Ref2)>nchar(Ref1)){
+    Ref<-Ref2 #The longer ref is the "new ref"
+    
+    #Set this up as a vector named by the position of each base
+    Ref_vec=as.vector(str_split(Ref,"",simplify=T))
+    names(Ref_vec)=seq_along(Ref_vec)+Pos2-1
+    
+    #Do the same for the Alt1 vector
+    Alt1_vec=as.vector(str_split(Alt1,"",simplify=T))
+    names(Alt1_vec)=seq_along(Alt1_vec)+Pos1-1
+    
+    #Make the new Alt1 by replacing the matching positions of the Ref vec
+    Alt1_new_vec<-Ref_vec
+    Alt1_new_vec[names(Alt1_vec)]<-Alt1_vec
+    Alt1<-paste0(Alt1_new_vec,collapse="")
+    
+  } else if(nchar(Ref1)>nchar(Ref2)){
+    Ref<-Ref1 #The longer ref is the "new ref"
+    
+    #Set this up as a vector named by the position of each base
+    Ref_vec=as.vector(str_split(Ref,"",simplify=T))
+    names(Ref_vec)=seq_along(Ref_vec)+Pos1-1
+    
+    #Do the same for the Alt1 vector
+    Alt2_vec=as.vector(str_split(Alt2,"",simplify=T))
+    names(Alt2_vec)=seq_along(Alt2_vec)+Pos2-1
+    
+    #Make the new Alt1 by replacing the matching positions of the Ref vec
+    Alt2_new_vec<-Ref_vec
+    Alt2_new_vec[names(Alt2_vec)]<-Alt2_vec
+    Alt2<-paste0(Alt2_new_vec,collapse="")
+  }
+  return(list(Ref=Ref,Alt1=Alt1,Alt2=Alt2))
+}
