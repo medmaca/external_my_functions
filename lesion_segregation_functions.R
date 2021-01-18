@@ -190,7 +190,7 @@ find_PVV_lesion_node=function(mut,allocated_node,pos_test,neg_test,tree,matrices
     return(curr)
   }
   
-  mut_df=create_mut_df(mut=mut1,tree=tree,matrices=matrices)
+  mut_df=create_mut_df(mut=mut,tree=tree,matrices=matrices)
   
   if(filter_output_df$pos_test[filter_output_df$mut==mut]) {
     #if the negative sub-clade is within the allocated node, then "pos_test" will be true and "allocated_node" is the "initial_lesion_node"
