@@ -379,25 +379,43 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
 }
 
 check_matching_phasing=function(phasing_info1,phasing_info2) {
-  if(any(sapply(c(phasing_info1,phasing_info2),is.logical))) {
+  if(any(sapply(list(phasing_info1,phasing_info2),is.logical))) {
     result<-"Unable to confirm phasing"
   } else {
     comb_df=inner_join(phasing_info1,phasing_info2,by="SNP_site")
+    comb_df$depth=comb_df$n_alt_reads_supporting.x+comb_df$n_alt_reads_supporting.y+comb_df$n_ref_reads_supporting.x+comb_df$n_ref_reads_supporting.y
+    
+    #Test if the called SNPs appear real
+    true_het1<-comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.x
+    true_het2<-comb_df$alt_phases_with_base.y!=comb_df$ref_phases_with_base.y
+    het_test=mapply(FUN=function(x,y) {vec=c(x,y);vec<-vec[!is.na(vec)];if(length(vec)==0) {return(T)} else if(all(vec)) {return(T)} else {return(F)}},x=true_het1,y=true_het2)
+    
+    #If no true het SNPs, stop function; else filter the comb_df
+    if(!any(het_test)) {
+      stop(return("No SNPs appear to be heterozygous"))
+    } else {
+      comb_df<-comb_df[het_test,]
+    }
     
     #Test for either alt matching alt, or ref matching ref for any individual SNP
-    Matching_alt_phasing<-any(comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y)&all(sapply(comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y,function(x) is.na(x)|x))
-    Matching_ref_phasing<-any(comb_df$ref_phases_with_base.x==comb_df$ref_phases_with_base.y)&all(sapply(comb_df$ref_phases_with_base.x==comb_df$ref_phases_with_base.y,function(x) is.na(x)|x))
+    matching_res=list(Matching_alt_phasing=comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y,
+                      Matching_ref_phasing=comb_df$ref_phases_with_base.x==comb_df$ref_phases_with_base.y,
+                      Non_matching_alt_ref_phasing=comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.y,
+                      Non_matching_ref_alt_phasing=comb_df$ref_phases_with_base.x!=comb_df$alt_phases_with_base.y)
     
-    #Alternatively, confirm MISMATCH between one confirmed ref and the other confirmed alt
-    Non_matching_alt_ref_phasing<-any(comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.y)&all(sapply(comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.y,function(x) is.na(x)|x))
-    Non_matching_ref_alt_phasing<-any(comb_df$ref_phases_with_base.x!=comb_df$alt_phases_with_base.y)&all(sapply(comb_df$ref_phases_with_base.x!=comb_df$alt_phases_with_base.y,function(x) is.na(x)|x))
+    matching_res=lapply(matching_res, function(vec) {
+      names(vec)<-1:length(vec)
+      vec_no_NAs<-vec[!is.na(vec)]
+        if(length(unique(vec_no_NAs))>1) { #If there is disagreement between different SNPs, retain the highest dpeth ones only
+          vec_no_NAs<-vec_no_NAs[as.character(which(comb_df$depth>median(comb_df$depth)))]
+          }
+        return(vec_no_NAs)
+    })
     
-    results_vec=c(Matching_alt_phasing,Matching_ref_phasing,Non_matching_alt_ref_phasing,Non_matching_ref_alt_phasing)
-    
-    if(any(results_vec)&!any(!results_vec)){
-      result<-"Same phasing confirmed"
-    } else if(all(sapply(results_vec,is.na))) {
+    if(all(sapply(matching_res,function(x) length(x)==0))){
       result<-"Unable to confirm phasing"
+    } else if(all(unlist(matching_res))) {
+      result<-"Same phasing confirmed"
     } else {
       result<-"Non-matching phasing confirmed"
     }
@@ -433,8 +451,8 @@ create_MAV_df=function(mut1,mut2,tree,matrices) {
   all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
   
   MAV_df<-Reduce(rbind,mapply(function(samples,clade) {return(data.frame(NV1=sum(matrices$NV[mut1,samples]),NV2=sum(matrices$NV[mut2,samples]),NR=(sum(matrices$NV[mut2,samples])+sum(matrices$NR[mut1,samples])),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
-  MAV_df$mut1_pos_test<-apply(MAV_df,1,function(x){(x[3]>=8 & (x[1]/x[3])>=0.3)|(x[3]>=6 & (x[1]/x[3])>=0.5)})
-  MAV_df$mut2_pos_test<-apply(MAV_df,1,function(x){(x[3]>=8 & (x[2]/x[3])>=0.3)|(x[3]>=6 & (x[2]/x[3])>=0.5)})
+  MAV_df$mut1_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[1]/x[3])>=0.25)|(x[3]>=8 & (x[1]/x[3])>=0.3)|(x[3]>=5 & (x[1]/x[3])>=0.5)})
+  MAV_df$mut2_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[2]/x[3])>=0.25)|(x[3]>=8 & (x[2]/x[3])>=0.3)|(x[3]>=5 & (x[2]/x[3])>=0.5)})
   MAV_df$neg_test<-apply(MAV_df,1,function(x){sum(x[1:2])==0 & (x[3])>=10})
   
   return(MAV_df)
