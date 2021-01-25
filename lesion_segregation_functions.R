@@ -451,8 +451,8 @@ create_MAV_df=function(mut1,mut2,tree,matrices) {
   all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
   
   MAV_df<-Reduce(rbind,mapply(function(samples,clade) {return(data.frame(NV1=sum(matrices$NV[mut1,samples]),NV2=sum(matrices$NV[mut2,samples]),NR=(sum(matrices$NV[mut2,samples])+sum(matrices$NR[mut1,samples])),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
-  MAV_df$mut1_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[1]/x[3])>=0.25)|(x[3]>=8 & (x[1]/x[3])>=0.3)|(x[3]>=5 & (x[1]/x[3])>=0.5)})
-  MAV_df$mut2_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[2]/x[3])>=0.25)|(x[3]>=8 & (x[2]/x[3])>=0.3)|(x[3]>=5 & (x[2]/x[3])>=0.5)})
+  MAV_df$mut1_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[1]/x[3])>=0.2)|(x[3]>=7 & (x[1]/x[3])>=0.25)|(x[3]>=5 & (x[1]/x[3])>=0.5)})
+  MAV_df$mut2_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[2]/x[3])>=0.2)|(x[3]>=7 & (x[2]/x[3])>=0.25)|(x[3]>=5 & (x[2]/x[3])>=0.5)})
   MAV_df$neg_test<-apply(MAV_df,1,function(x){sum(x[1:2])==0 & (x[3])>=10})
   
   return(MAV_df)
