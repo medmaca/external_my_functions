@@ -246,7 +246,11 @@ find_MAV_lesion_node=function(node1,node2,tree) {
 extract_phasing_info=function(list,Ref,Alt) {
   phasing_df=Reduce(rbind,list)
   #basects_df=Reduce(rbind,lapply(list,function(list) return(list[[2]])))
-  if(nrow(phasing_df)==0) {stop(return(NA))}
+  if(is.logical(phasing_df)) {
+    stop(return(NA))
+  } else if(nrow(phasing_df)==0){
+    stop(return(NA))
+  }
   phasing_df$mut_base=sapply(strsplit(phasing_df$Mutation_allele,split = "="),function(x) x[2])
   phasing_df$snp_base=sapply(strsplit(phasing_df$SNP_allele,split = "="),function(x) x[2])
   
@@ -311,7 +315,12 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
-      phasing=read.table(phasing_output_file,header = T)
+      if(file.exists(phasing_output_file)){
+        phasing=read.table(phasing_output_file,header = T)
+      } else {
+        print("Unable to run phasing script")
+        phasing=NA
+      }
       return(phasing)
     })
   } else if(is.data.frame(project)) {
@@ -329,11 +338,14 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
-      phasing=read.table(phasing_output_file,header = T)
+      if(file.exists(phasing_output_file)){
+        phasing=read.table(phasing_output_file,header = T)
+      } else {
+        phasing="Unable to run phasing script"
+      }
       return(phasing)
     })
   }
-  
   setwd(wd)
   return(phasing_list)
 }
@@ -524,10 +536,9 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     colnames(project)<-c("sample","project")
   } else if(dataset=="PR") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"/snp_tree_with_branch_length_polytomised.tree")
-    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Filtered_muts_",Sample_ID)
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"/Filtered_muts_",Sample_ID)
     project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/PR/Samples_project_ref_PR.csv",header=T)
-    project<-project[,c("Sample","Project")]
-    colnames(project)<-c("sample","project")
+    project<-project[,c("sample","project")]
   }
   return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project))
 }
