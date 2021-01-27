@@ -699,6 +699,46 @@ plot_MAV_mut=function(tree,
   }
 }
 
+confirm_PVV_phylogeny=function(tree,
+                               details,
+                               matrices,
+                               node,
+                               mut,
+                               PVV_mut=NULL,
+                               lesion_node,
+                               colours=c("black","green","red"),
+                               cex=0.4,
+                                #show_pval=FALSE,
+                                ...) {
+  #Define the col.scale from the colours vector
+  require(dichromat)
+  colfunc = colorRampPalette(colours)
+  col.scale = colfunc(101)
+  
+  #Get the samples within the lesion node
+  lesion_node_samples=getTips(tree,lesion_node)
+  
+  #Get the vaf
+  info=get_edge_info(tree,details,node=node)
+  samples=info$samples
+  variant_reads=sum(matrices$NV[mut,samples])
+  total_reads=sum(matrices$NR[mut,samples])
+  vaf=variant_reads/total_reads
+  
+  #Plot the vaf on the tree using the colour scale
+  if(length(tree$edge.length[tree$edge[,2]==node])>0){
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=col.scale[ceiling(100*vaf)],lend=1,...)
+  }
+  
+  #Print the total depth for that branch at the node
+  if(variant_reads>0|node %in% which(tree$tip.label %in% lesion_node_samples))
+    text(info$x,info$yb,paste0(variant_reads,"/",total_reads),srt=90,cex = cex,col="black",font=2)
+  
+  #Print the mutation name and log10(pvalue)
+  if(node==1) {text(1,1,pos=4,paste("Confirmation of phylogeny for",PVV_mut,":", mut))}
+  #if(show_pval&"pval"%in%colnames(details)){text(1,50,pos=4,paste0("Log10 p-value for allocated node:",round(log10(details$pval[details$mut_ref==mut]))))} 
+}
+
 
 ###FUNCTIONS TO GO WITH THE APE "PLOT.PHYLO" FUNCTION
 

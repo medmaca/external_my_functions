@@ -10,6 +10,28 @@ get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor 
   return(curr)
 }
 
+get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor (i.e. the direct parent) use degree=1.  Use higher degrees to go back several generations.
+  curr<-node
+  for(i in 1:degree){
+    curr=tree$edge[which(tree$edge[,2]==curr),1]
+    if(curr==(1+length(tree$tip.label))) {stop(return(curr))}
+  }
+  return(curr)
+}
+
+#Function for Nick's alternative rho estimation approach (faster)
+loglik=function(par,nmuts,depth){
+  idx=which(!is.na(nmuts/depth))
+  sum(VGAM::dbetabinom(x =nmuts[idx],size = depth[idx],prob = par[2],rho = par[1],log = T))
+}
+
+findrho=function(NV_vec,NR_vec){
+  pseudo=1e-6
+  optres=optim(par=c(0.1,0.1),loglik, gr = NULL,method="L-BFGS-B",lower=c(pseudo,pseudo),upper=c(0.8,0.9),control=list(fnscale=-1),nmuts=NV_vec,depth=NR_vec)
+  #c(rho=optres$par[1],p=optres$par[2])
+  optres$par[1]
+}
+
 #Define the "get_node_types" function required for following the lesion journey in the case of PVVs
 #It uses the mutation dataframe ("mut_df") to work out whether daughter branches of a node are (a) a mutant allele (b) wild-type or (c) mixed
 get_node_types=function(lesion_children,mut_df,tree) {
@@ -301,6 +323,7 @@ extract_phasing_info=function(list,Ref,Alt) {
 
 #Function will look in the supplied output_dir to see if phasing output for given sample/Chrom/Pos already exists, if not will run the .jl script. Imports the data.
 #Run example: get_phasing_list(samples=positive_samples1,Chrom=Chrom,Pos=Pos,project=project,output_dir = phasing_output_dir,ref_sample_set = Ref_sample_set)
+
 get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
@@ -310,8 +333,25 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
       if(!file.exists(phasing_output_file)) {
-        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
-        system(command)
+        #This section is to account for the long bam headers in sample PD44579b which interfere with the script
+        if(grepl("PD44579b",sample)) {
+          #Import all the necessary bams with edited headers
+          sapply(c(sample,unlist(strsplit(ref_sample_set,","))),function(bam_sample) {
+            new_bam_path=paste0("new_bams/",bam_sample,".sample.dupmarked.bam")
+            if(!file.exists(new_bam_path)) {
+              print(paste("Importing bam file for",bam_sample,"and replacing header"))
+              bam_path=paste0("/nfs/cancer_ref01/nst_links/live/",project,"/",bam_sample,"/",bam_sample,".sample.dupmarked.bam")
+              command=paste("julia header_edit.jl",bam_path,"offending_string.txt")
+              system(command)
+            }
+          })
+          #Now run using the modified julia script to use these local files
+          command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams","1000",phasing_output_file,basects_output_file,ref_sample_set)
+          system(command) 
+        } else {
+          command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+          system(command) 
+        }
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
@@ -349,6 +389,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
   setwd(wd)
   return(phasing_list)
 }
+
 
 get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F) {
   wd<-getwd()
@@ -506,6 +547,32 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
     }
   }
   return(pure_subclades)
+}
+
+get_mixed_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
+  if(is.null(mut2)) {test_type="PVV"} else {test_type="MAV"}
+  print(paste("Testing",test_type))
+  
+  if(test_type=="PVV"){mut_df=create_mut_df(mut=mut1,tree=tree,matrices=matrices)} else {mut_df=create_MAV_df(mut1=mut1,mut2=mut2,tree=tree,matrices=matrices)}
+  
+  #1. get daughter nodes of lesion node
+  lesion_children=get_node_children(lesion_node,tree=tree)
+  if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
+    print("Removing polytomy")
+    keep_children=sapply(lesion_children, function(node) {nodes=get_all_node_children(node,tree=tree); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
+    lesion_children<-lesion_children[keep_children]
+  }
+  
+  #Test these daughter nodes to see if they are "pure positive", "pure negative" or "mixed"
+  if(test_type=="PVV") {types=get_node_types(lesion_children,mut_df,tree=tree)} else {types=get_MAV_node_types(lesion_children,mut_df,tree=tree)}
+  names(lesion_children)<-types
+  if(sum(types=="mixed")>1) {
+    stop(return("More than one mixed subclade identified - indicative that not caused by a persistent DNA lesion"))
+  } else if(sum(types=="mixed")==0){
+    stop(return("No mixed daughters"))
+  } else {
+    return(lesion_children["mixed"])
+  }
 }
 
 get_file_paths_and_project=function(dataset,Sample_ID) {
