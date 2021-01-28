@@ -606,6 +606,10 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"/Filtered_muts_",Sample_ID)
     project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/PR/Samples_project_ref_PR.csv",header=T)
     project<-project[,c("sample","project")]
+  } else if(dataset=="MF"){
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_noMixed.tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/filtered_muts_",Sample_ID,"_noMixed")
+    project=2305
   }
   return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project))
 }
