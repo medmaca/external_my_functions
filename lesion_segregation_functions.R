@@ -332,7 +332,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
-      if(!file.exists(phasing_output_file)) {
+      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0) {
         #This section is to account for the long bam headers in sample PD44579b which interfere with the script
         if(grepl("PD44579b",sample)) {
           #Import all the necessary bams with edited headers
@@ -355,7 +355,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
-      if(file.exists(phasing_output_file)){
+      if(file.exists(phasing_output_file)&file.info(phasing_output_file)$size!=0){
         phasing=read.table(phasing_output_file,header = T)
       } else {
         print("Unable to run phasing script")
@@ -372,13 +372,13 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",")
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
       
-      if(!file.exists(phasing_output_file)) {
+      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0) {
         command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
-      if(file.exists(phasing_output_file)){
+      if(file.exists(phasing_output_file)&file.info(phasing_output_file)$size!=0){
         phasing=read.table(phasing_output_file,header = T)
       } else {
         phasing="Unable to run phasing script"
