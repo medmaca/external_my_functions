@@ -233,8 +233,8 @@ find_PVV_lesion_node=function(mut,allocated_node,pos_test,neg_test,tree,matrices
   return(initial_lesion_node)
 }
 
-find_MAV_lesion_node=function(node1,node2,tree) {
-  if(node1==node2) {
+find_MAV_lesion_node=function(node1,node2,tree,Chrom="auto") {
+  if(node1==node2 & !Chrom%in%c("X","Y")) {
     stop(return(return(list(initial_lesion_node=NA,Filter="FAIL",Class="FAIL"))))
   } else {
     #get the ancestral nodes
@@ -522,7 +522,7 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   lesion_children=get_node_children(lesion_node,tree=tree)
   if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
     print("Removing polytomy")
-    keep_children=sapply(lesion_children, function(node) {nodes=get_all_node_children(node,tree=tree); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
+    keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
     lesion_children<-lesion_children[keep_children]
   }
   
@@ -532,7 +532,7 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   names(lesion_children)<-types
   pure_subclades=lesion_children[names(lesion_children)!="mixed"]
   
-  for(k in 1:5) {
+  while(any(names(lesion_children)=="mixed")) {
     lesion_node=lesion_children["mixed"] #Get the new lesion node for this iteration (the "mixed" descendant of the previous lesion node)
     lesion_children=get_node_children(lesion_node,tree=tree)
     if(test_type=="PVV") {types=get_node_types(lesion_children,mut_df,tree=tree)} else {types=get_MAV_node_types(lesion_children,mut_df,tree=tree)}
@@ -559,7 +559,7 @@ get_mixed_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   lesion_children=get_node_children(lesion_node,tree=tree)
   if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
     print("Removing polytomy")
-    keep_children=sapply(lesion_children, function(node) {nodes=get_all_node_children(node,tree=tree); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
+    keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
     lesion_children<-lesion_children[keep_children]
   }
   
