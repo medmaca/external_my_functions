@@ -214,12 +214,15 @@ find_PVV_lesion_node=function(mut,allocated_node,pos_test,neg_test,tree,matrices
   
   mut_df=create_mut_df(mut=mut,tree=tree,matrices=matrices)
   
-  if(filter_output_df$pos_test[filter_output_df$mut==mut]) {
+  if(pos_test) {
     #if the negative sub-clade is within the allocated node, then "pos_test" will be true and "allocated_node" is the "initial_lesion_node"
     initial_lesion_node<-allocated_node
-  } else if (filter_output_df$neg_test[filter_output_df$mut==mut]){
+  } else if (neg_test){
     #If there is a positive clade outside the allocated node, then "neg_test" will be true.  In this case need to find the positive clade.
     #Do this be iteratively going from the allocated node to its ancestral node and looking for the ancestral node that contains ALL positive clades in the tree
+    all_clades=unique(tree$edge[,2])
+    all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
+    
     for(j in 1:3) {
       ancestor=get_ancestor_node(allocated_node,tree,degree=j)
       ancestor_tips=getTips(tree,ancestor)
@@ -450,6 +453,15 @@ check_matching_phasing=function(phasing_info1,phasing_info2) {
       comb_df<-comb_df[het_test,]
     }
     
+    #Although heterozygosity is likely after the above test, it is not confirmed. Test for this:
+    het_confirmed=apply(comb_df[,c("ref_phases_with_base.x","ref_phases_with_base.y","alt_phases_with_base.x","alt_phases_with_base.y")],1,function(x) length(unique(x[!is.na(x)]))>1)
+    if(any(het_confirmed)) {
+      comb_df<-comb_df[het_confirmed,]
+      het_not_confirmed<-F
+    } else {
+      het_not_confirmed<-T
+    }
+    
     #Test for either alt matching alt, or ref matching ref for any individual SNP
     matching_res=list(Matching_alt_phasing=comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y,
                       Matching_ref_phasing=comb_df$ref_phases_with_base.x==comb_df$ref_phases_with_base.y,
@@ -459,7 +471,7 @@ check_matching_phasing=function(phasing_info1,phasing_info2) {
     matching_res=lapply(matching_res, function(vec) {
       names(vec)<-1:length(vec)
       vec_no_NAs<-vec[!is.na(vec)]
-        if(length(unique(vec_no_NAs))>1) { #If there is disagreement between different SNPs, retain the highest dpeth ones only
+        if(length(unique(vec_no_NAs))>1) { #If there is disagreement between different SNPs, retain the highest depth ones only
           vec_no_NAs<-vec_no_NAs[as.character(which(comb_df$depth>median(comb_df$depth)))]
           }
         return(vec_no_NAs)
@@ -468,13 +480,23 @@ check_matching_phasing=function(phasing_info1,phasing_info2) {
     if(all(sapply(matching_res,function(x) length(x)==0))){
       result<-"Unable to confirm phasing"
     } else if(all(unlist(matching_res))) {
-      result<-"Same phasing confirmed"
+      if(het_not_confirmed) {
+        result<-"Same phasing suggested, though SNP heterozygosity not confirmed"
+      } else {
+        result<-"Same phasing confirmed"
+      }
     } else {
-      result<-"Non-matching phasing confirmed"
+      if(het_not_confirmed) {
+        result<-"Non-matching suggested, though SNP heterozygosity not confirmed"
+      } else {
+        result<-"Non-matching phasing confirmed"
+      }
     }
   }
   return(result)
 }
+
+
 
 check_for_both_alleles_confirming_ref=function(phasing_info) {
   if(is.logical(phasing_info)) {
