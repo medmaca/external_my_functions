@@ -48,6 +48,80 @@ get_node_types=function(lesion_children,mut_df,tree) {
   return(types)
 }
 
+#The function to assess all the mutations for whether they are phylogeny breaking
+create_PVV_filter_table=function(mutations_to_test,details,tree,matrices,look_back=3,remove_duplicates=F,duplicate_samples=NULL,MC_CORES=1) {
+  require(dplyr)
+  require(parallel)
+  print(paste("Assessing",length(mutations_to_test),"mutations for whether they are truly phylogeny breaking"))
+  if(look_back=="all"){
+    all_clades=unique(tree$edge[,2])
+    all_clade_nodes=lapply(all_clades,function(node) c(node,get_all_node_children(node,tree)))
+  }
+  filter_output=mclapply(mutations_to_test,function(mut) {
+    if(which(mutations_to_test==mut)%%1000==0){print(which(mutations_to_test==mut))}
+    allocated_node=details$node[details$mut_ref==mut]
+    
+    #Get counts of all individual clades within the allocated node i.e. those expected to be positive
+    positive_clades=get_all_node_children(allocated_node,tree)
+    if(remove_duplicates) {positive_clades=positive_clades[!positive_clades%in%duplicate_samples]} #don't assess duplicate samples as individual samples
+    positive_clade_nodes=lapply(positive_clades,function(node) c(node,get_all_node_children(node,tree)))
+    positive_clade_samples=lapply(positive_clade_nodes,function(nodes) return(tree$tip.label[nodes[nodes%in%1:length(tree$tip.label)]]))
+    NV_pos=unlist(lapply(positive_clade_samples,function(samples) sum(matrices$NV[mut,samples])))
+    NR_pos=unlist(lapply(positive_clade_samples,function(samples) sum(matrices$NR[mut,samples])))
+    
+    #If we previously removed duplicates, need to rederive the "positive_clade_nodes" including duplicates for filtering out ALL positive clades in the next section
+    if(remove_duplicates) { 
+      positive_clades=get_all_node_children(allocated_node,tree)
+      positive_clade_nodes=lapply(positive_clades,function(node) c(node,get_all_node_children(node,tree)))
+    }
+    
+    #Get counts of nearby individual clades that don't include the allocated node, i.e. those expected to be negative
+    if(look_back=="all"){
+      select=lapply(all_clade_nodes,function(nodes)if(!any(nodes%in%positive_clade_nodes)){TRUE}else{FALSE})
+      negative_clades=all_clades[unlist(select)]
+      if(remove_duplicates) {negative_clades=negative_clades[!negative_clades%in%duplicate_samples]}
+      negative_clade_nodes=lapply(negative_clades,function(node) c(node,get_all_node_children(node,tree)))
+      negative_clade_samples=lapply(negative_clade_nodes,function(nodes) return(tree$tip.label[nodes[nodes%in%1:length(tree$tip.label)]]))
+      NV_neg=unlist(lapply(negative_clade_samples,function(samples) sum(matrices$NV[mut,samples])))
+      NR_neg=unlist(lapply(negative_clade_samples,function(samples) sum(matrices$NR[mut,samples])))
+    } else {
+      #Assess only "nearby" to the allocated node (up to the degree specified by look_back argument)
+      ancestral_node=get_ancestor_node(allocated_node,tree,degree=look_back)
+      all_clades=c(ancestral_node,get_all_node_children(ancestral_node,tree))
+      all_clade_nodes=lapply(all_clades,function(node) c(node,get_all_node_children(node,tree)))
+      
+      select=lapply(all_clade_nodes,function(nodes)if(!any(nodes%in%positive_clade_nodes)){TRUE}else{FALSE})
+      negative_clades=all_clades[unlist(select)]
+      if(remove_duplicates) {negative_clades=negative_clades[!negative_clades%in%duplicate_samples]}
+      negative_clade_nodes=lapply(negative_clades,function(node) c(node,get_all_node_children(node,tree)))
+      negative_clade_samples=lapply(negative_clade_nodes,function(nodes) return(tree$tip.label[nodes[nodes%in%1:length(tree$tip.label)]]))
+      NV_neg=unlist(lapply(negative_clade_samples,function(samples) sum(matrices$NV[mut,samples])))
+      NR_neg=unlist(lapply(negative_clade_samples,function(samples) sum(matrices$NR[mut,samples])))
+    }
+    
+    #Apply beta-binomial filter to these counts to get sense of overdispersion
+    NR_pos[NR_pos==0]<-1; NR_neg[NR_neg==0]<-1 #Set sites with 0 depth to a depth of 1
+    pos_rho=findrho(NV_vec=NV_pos,NR_vec=NR_pos)
+    neg_rho=findrho(NV_vec=NV_neg,NR_vec=NR_neg)
+    
+    #Additional filters to check not just for overdispersion, but that at least one clade unexpectedly truly negative or positive
+    pos_test=any(NV_pos==0 & NR_pos>=10) #is there at least one "WT" sub-clade with zero variant reads with a depth of ≥ 10
+    neg_test=any((NV_neg/NR_neg)>=0.3 & NR_neg >=8) #is there at least one anticipated "negative" clade, that in fact has a VAF>0.3 with a depth ≥8
+    
+    mut_params=data.frame(mut=mut,
+                          node=allocated_node,
+                          pos_rho=pos_rho,
+                          neg_rho=neg_rho,
+                          pos_test=pos_test,
+                          neg_test=neg_test,
+                          pval=details$pval[which(details$mut_ref==mut)])
+    return(mut_params) 
+  },mc.cores = MC_CORES)
+  
+  filter_output_df=dplyr::bind_rows(filter_output)
+  return(filter_output_df)
+}
+
 #As above, but can incorporate two alternative mutant alleles, therefore suitable for MAVs
 get_MAV_node_types=function(lesion_children,mut_df,tree) {
   types=sapply(lesion_children, function(node) {
@@ -137,7 +211,7 @@ reclassify_MNVs=function(COMB_mats,region_size=2,genomeFile) {
         return(data.frame(mut_ref=paste(chrom,pos[1],new_ref,new_alt,sep="-"),Chrom=chrom,Pos=pos[1],Ref=new_ref,Alt=new_alt,Mut_type="MNV",node=node,pval=mean(pval)))
       }
     })
-    new_df=Reduce(rbind,new_df)
+    new_df=dplyr::bind_rows(new_df)
     
     replaced_SNVs=unlist(out_list)
     SNVs_for_counts=sapply(out_list,function(x) x[1])
@@ -223,13 +297,19 @@ find_PVV_lesion_node=function(mut,allocated_node,pos_test,neg_test,tree,matrices
     all_clades=unique(tree$edge[,2])
     all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
     
-    for(j in 1:3) {
+    #Iteratively look back through ancestral nodes to find the one encasing other positive samples
+    j=1
+    repeat {
       ancestor=get_ancestor_node(allocated_node,tree,degree=j)
       ancestor_tips=getTips(tree,ancestor)
       #Look at clades that don't have any of the samples in "ancestor_tips". If this ancestor is the "initial_lesion_node", none will meet the "pos_test".
       if(!any(mut_df$pos_test[unlist(lapply(all_clade_samples, function(samples) !any(samples %in% ancestor_tips)))])) {
         break #Once this criteria is met, do not need to look back any further
       }
+      else if(ancestor==tree$edge[1,1]){
+        break
+      }
+      j=j+1
     }
     initial_lesion_node<-ancestor #The initial lesion node is therefore the most recent "ancestor" from the previous loop
   }
@@ -269,7 +349,7 @@ find_MAV_lesion_node=function(node1,node2,tree,Chrom="auto") {
 
 #This function extracts a straight-forward phasing info df from the julia algorithm output
 extract_phasing_info=function(list,Ref,Alt) {
-  phasing_df=Reduce(rbind,list)
+  phasing_df=dplyr::bind_rows(list)
   #basects_df=Reduce(rbind,lapply(list,function(list) return(list[[2]])))
   if(is.logical(phasing_df)) {
     stop(return(NA))
@@ -320,7 +400,7 @@ extract_phasing_info=function(list,Ref,Alt) {
     )
     )
   })
-  phasing_by_SNP_df=Reduce(rbind,phasing_by_SNP_list)
+  phasing_by_SNP_df=dplyr::bind_rows(phasing_by_SNP_list)
   return(phasing_by_SNP_df)
 }
 
@@ -514,7 +594,7 @@ create_mut_df=function(mut,tree,matrices) {
   all_clades=unique(tree$edge[,2])
   all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
   
-  mut_df<-Reduce(rbind,mapply(function(samples,clade) {return(data.frame(NV=sum(matrices$NV[mut,samples]),NR=sum(matrices$NR[mut,samples]),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
+  mut_df<-dplyr::bind_rows(mapply(function(samples,clade) {return(data.frame(NV=sum(matrices$NV[mut,samples]),NR=sum(matrices$NR[mut,samples]),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
   mut_df$pos_test<-apply(mut_df,1,function(x){(x[2]>=8 & (x[1]/x[2])>=0.3)|(x[2]>=6 & (x[1]/x[2])>=0.5)})
   mut_df$neg_test<-apply(mut_df,1,function(x){x[1]==0 & (x[2])>=10})
   return(mut_df)
@@ -525,7 +605,7 @@ create_MAV_df=function(mut1,mut2,tree,matrices) {
   all_clades=unique(tree$edge[,2])
   all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
   
-  MAV_df<-Reduce(rbind,mapply(function(samples,clade) {return(data.frame(NV1=sum(matrices$NV[mut1,samples]),NV2=sum(matrices$NV[mut2,samples]),NR=(sum(matrices$NV[mut2,samples])+sum(matrices$NR[mut1,samples])),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
+  MAV_df<-dplyr::bind_rows(mapply(function(samples,clade) {return(data.frame(NV1=sum(matrices$NV[mut1,samples]),NV2=sum(matrices$NV[mut2,samples]),NR=(sum(matrices$NV[mut2,samples])+sum(matrices$NR[mut1,samples])),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
   MAV_df$mut1_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[1]/x[3])>=0.2)|(x[3]>=7 & (x[1]/x[3])>=0.25)|(x[3]>=5 & (x[1]/x[3])>=0.5)})
   MAV_df$mut2_pos_test<-apply(MAV_df,1,function(x){(x[3]>=12 & (x[2]/x[3])>=0.2)|(x[3]>=7 & (x[2]/x[3])>=0.25)|(x[3]>=5 & (x[2]/x[3])>=0.5)})
   MAV_df$neg_test<-apply(MAV_df,1,function(x){sum(x[1:2])==0 & (x[3])>=10})
