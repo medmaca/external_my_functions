@@ -630,7 +630,11 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   
   #Test these daughter nodes to see if they are "pure positive", "pure negative" or "mixed"
   if(test_type=="PVV") {types=get_node_types(lesion_children,mut_df,tree=tree)} else {types=get_MAV_node_types(lesion_children,mut_df,tree=tree)}
-  if(sum(types=="mixed")>1) {stop(return("More than one mixed subclade identified - indicative that not caused by a persistent DNA lesion"))}
+  if(sum(types=="mixed")>1) {
+    stop(return("More than one mixed subclade identified - indicative that not caused by a persistent DNA lesion"))
+  } else if(length(unique(types))==1){
+    stop(return("Not PVV"))  
+    }
   names(lesion_children)<-types
   pure_subclades=lesion_children[names(lesion_children)!="mixed"]
   
