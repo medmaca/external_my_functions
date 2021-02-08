@@ -624,7 +624,7 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   lesion_children=get_node_children(lesion_node,tree=tree)
   if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
     print("Removing polytomy")
-    keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
+    keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(any(mut_df$pos_test[mut_df$clades%in%nodes]))})
     lesion_children<-lesion_children[keep_children]
   }
   
