@@ -407,7 +407,7 @@ extract_phasing_info=function(list,Ref,Alt) {
 #Function will look in the supplied output_dir to see if phasing output for given sample/Chrom/Pos already exists, if not will run the .jl script. Imports the data.
 #Run example: get_phasing_list(samples=positive_samples1,Chrom=Chrom,Pos=Pos,project=project,output_dir = phasing_output_dir,ref_sample_set = Ref_sample_set)
 
-get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F) {
+get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F,distance=1000) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
   if(is.numeric(project)) {
@@ -432,7 +432,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
           command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams","1000",phasing_output_file,basects_output_file,ref_sample_set)
           system(command) 
         } else {
-          command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+          command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
           system(command) 
         }
       } else if(verbose) {
@@ -456,7 +456,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
       
       if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0) {
-        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
@@ -474,7 +474,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
 }
 
 
-get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F) {
+get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F,distance=1000) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
   if(is.numeric(project)) {
@@ -483,7 +483,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
       if(!file.exists(phasing_output_file)) {
-        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
@@ -500,7 +500,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",") #Define a random set of samples (in the same project) from the tree used for finding heterozgous SNPs in the .jl phasing script
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
       if(!file.exists(phasing_output_file)) {
-        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,"1000",phasing_output_file,basects_output_file,ref_sample_set)
+        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
@@ -576,6 +576,31 @@ check_matching_phasing=function(phasing_info1,phasing_info2) {
   return(result)
 }
 
+get_confirmed_heterozygous_SNPs=function(phasing_info1,phasing_info2){
+  comb_df=full_join(phasing_info1,phasing_info2,by="SNP_site")
+  comb_df$depth=comb_df$n_alt_reads_supporting.x+comb_df$n_alt_reads_supporting.y+comb_df$n_ref_reads_supporting.x+comb_df$n_ref_reads_supporting.y
+  
+  #Test if the called SNPs appear real
+  true_het1<-comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.x
+  true_het2<-comb_df$alt_phases_with_base.y!=comb_df$ref_phases_with_base.y
+  het_test=mapply(FUN=function(x,y) {vec=c(x,y);vec<-vec[!is.na(vec)];if(length(vec)==0) {return(T)} else if(all(vec)) {return(T)} else {return(F)}},x=true_het1,y=true_het2)
+  
+  #If no true het SNPs, stop function; else filter the comb_df
+  if(!any(het_test)) {
+    stop(return("No SNPs appear to be heterozygous"))
+  } else {
+    comb_df<-comb_df[het_test,]
+  }
+  
+  #Although heterozygosity is likely after the above test, it is not confirmed. Test for this:
+  het_confirmed=apply(comb_df[,c("ref_phases_with_base.x","ref_phases_with_base.y","alt_phases_with_base.x","alt_phases_with_base.y")],1,function(x) length(unique(x[!is.na(x)]))>1)
+  if(any(het_confirmed)) {
+    comb_df<-comb_df[het_confirmed,]
+    return(comb_df$SNP_site)
+  } else {
+    return(NA)
+  }
+}
 
 
 check_for_both_alleles_confirming_ref=function(phasing_info) {
