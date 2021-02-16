@@ -407,7 +407,7 @@ extract_phasing_info=function(list,Ref,Alt) {
 #Function will look in the supplied output_dir to see if phasing output for given sample/Chrom/Pos already exists, if not will run the .jl script. Imports the data.
 #Run example: get_phasing_list(samples=positive_samples1,Chrom=Chrom,Pos=Pos,project=project,output_dir = phasing_output_dir,ref_sample_set = Ref_sample_set)
 
-get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F,distance=1000) {
+get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,force_rerun=F,verbose=F) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
   if(is.numeric(project)) {
@@ -415,7 +415,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
-      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0) {
+      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
         #This section is to account for the long bam headers in sample PD44579b which interfere with the script
         if(grepl("PD44579b",sample)) {
           #Import all the necessary bams with edited headers
@@ -455,7 +455,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",")
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
       
-      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0) {
+      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
         command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
@@ -474,7 +474,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
 }
 
 
-get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,verbose=F,distance=1000) {
+get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,force_rerun=F,verbose=F) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
   if(is.numeric(project)) {
@@ -482,9 +482,25 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
-      if(!file.exists(phasing_output_file)) {
-        command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
-        system(command)
+      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
+        if(grepl("PD44579b",sample)) {
+          #Import all the necessary bams with edited headers
+          sapply(c(sample,unlist(strsplit(ref_sample_set,","))),function(bam_sample) {
+            new_bam_path=paste0("new_bams/",bam_sample,".sample.dupmarked.bam")
+            if(!file.exists(new_bam_path)) {
+              print(paste("Importing bam file for",bam_sample,"and replacing header"))
+              bam_path=paste0("/nfs/cancer_ref01/nst_links/live/",project,"/",bam_sample,"/",bam_sample,".sample.dupmarked.bam")
+              command=paste("julia header_edit.jl",bam_path,"offending_string.txt")
+              system(command)
+            }
+          })
+          #Now run using the modified julia script to use these local files
+          command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams","1000",phasing_output_file,basects_output_file,ref_sample_set)
+          system(command) 
+        } else {
+          command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
+          system(command) 
+        }
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
@@ -499,7 +515,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       sample_project=project$project[project$sample==sample]
       set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",") #Define a random set of samples (in the same project) from the tree used for finding heterozgous SNPs in the .jl phasing script
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
-      if(!file.exists(phasing_output_file)) {
+      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
         command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
@@ -509,7 +525,6 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       return(basects)
     })
   }
-  
   setwd(wd)
   return(basects_list)
 }
@@ -805,4 +820,36 @@ establish_ref_and_alt=function(Ref1,Ref2,Alt1,Alt2,Pos1,Pos2) {
     Alt2<-paste0(Alt2_new_vec,collapse="")
   }
   return(list(Ref=Ref,Alt1=Alt1,Alt2=Alt2))
+}
+
+#This looks through the output from the "Phase_MAVs.R" script and extracts a phasing summary
+extract_MAV_phasing_summary=function(MAV_list) {
+  if(class(list)!="list") {
+    stop(return("No result"))
+  } else if(is.null(list$positive_subclade_res)) {
+    stop(return("No result"))
+  } else {
+    res<-list$positive_subclade_res
+  }
+  
+  if(class(res)=="character") {
+    stop(return(res))
+  } else if(class(res)=="list"){
+    res_vec=unlist(res)
+  }
+  
+  if(length(res_vec)==1) {
+    stop(return(res_vec))
+  } else if(length(unique(res_vec))==1) {
+    return(res_vec[1])
+  } else {
+    res_vec_MAV<-res_vec[grepl("pure_mut1",names(res_vec))&grepl("pure_mut2",names(res_vec))]
+    if(length(res_vec_MAV)==0) {
+      stop(return("Unable to confirm phasing"))
+    } else if(any(res_vec_MAV=="Same phasing confirmed")) {
+      return("Same phasing confirmed")
+    } else {
+      return("Unable to confirm phasing")
+    }
+  } 
 }
