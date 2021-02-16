@@ -823,7 +823,7 @@ establish_ref_and_alt=function(Ref1,Ref2,Alt1,Alt2,Pos1,Pos2) {
 }
 
 #This looks through the output from the "Phase_MAVs.R" script and extracts a phasing summary
-extract_MAV_phasing_summary=function(MAV_list) {
+extract_MAV_phasing_summary=function(list) {
   if(class(list)!="list") {
     stop(return("No result"))
   } else if(is.null(list$positive_subclade_res)) {
