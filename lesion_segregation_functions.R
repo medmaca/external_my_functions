@@ -851,5 +851,168 @@ extract_MAV_phasing_summary=function(list) {
     } else {
       return("Unable to confirm phasing")
     }
-  } 
+  }
 }
+
+#A set of slightly fiddley functions to used in the functions to extract the phasing summary from the PVV phasing info
+confirm_het_SNP=function(phasing_info_df){
+  if(class(phasing_info_df)=="logical") {
+    return(NULL)
+  } else {
+    true_het<-phasing_info_df$alt_phases_with_base!=phasing_info_df$ref_phases_with_base
+    result=data.frame(SNP_site=phasing_info_df$SNP_site,res=sapply(true_het,function(res) {
+      if(is.na(res)) {
+        return(NA)
+      } else if(res) {
+        return("Heterozygous")
+      } else {
+        return("Not heterozygous")
+      }
+    }))
+    return(result) 
+  }
+}
+
+return_het_SNPs_from_positive_clades=function(positive_subclade_phasing_info) {
+  res=lapply(positive_subclade_phasing_info,confirm_het_SNP)
+  res[unlist(lapply(res,is.null))]<-NULL
+  comb_res=Reduce(f=function(df1,df2) {return(full_join(df1,df2,by="SNP_site"))},res)
+  if(!is.null(comb_res)&!all(is.na(comb_res[,grepl("res",colnames(comb_res))]))){
+    final_res=apply(comb_res[,-1,drop=F],1,function(x) {res<-x[!is.na(x)]; if(length(unique(res))==1){return(res[1])}else{return(NA)}})
+    het_SNPs=comb_res$SNP_site[final_res=="Heterozygous" & !is.na(final_res)]
+    if(length(het_SNPs)>0) {
+      return(het_SNPs) 
+    } else {
+      return(NULL)
+    }
+  } else {
+    return(NULL)
+  }
+}
+
+get_alt_base=function(SNP,positive_subclade_phasing_info) {
+  alts=unlist(lapply(positive_subclade_phasing_info,function(df) {
+    if(class(df)=="logical") {
+      return(NA)
+    } else {
+      return(df$alt_phases_with_base[df$SNP_site==SNP])
+    }
+  }))
+  alts<-alts[!is.na(alts)]
+  if(length(unique(alts))>1) {
+    return("Conflicting results")
+  } else {
+    names(alts)<-NULL
+    return(alts[1])
+  }
+}
+
+assess_presence_of_alt_allele=function(alt_bases,negative_subclade_phasing_info) {
+  het_SNP_sites=names(alt_bases)
+  res=lapply(negative_subclade_phasing_info,function(df) {
+    if(class(df)=="logical"|!any(het_SNP_sites%in%df$SNP_site)) {
+      return("Alt allele not confirmed")
+    } else {
+      res2=sapply(het_SNP_sites,function(SNP) {
+        alt_base=alt_bases[SNP]
+        if(SNP%in%df$SNP_site){
+          if(df$ref_phases_with_base[df$SNP_site==SNP]==alt_base) {
+            return("Alt allele reads present")
+          } else if(df$ref_phases_with_base[df$SNP_site==SNP]!=alt_base & df$n_ref_reads_against[df$SNP_site==SNP]>0) {
+            return("Alt allele reads present")
+          } else {
+            return("Alt allele not confirmed")
+          } 
+        } else {
+          return(NA)
+        }
+      })
+      res2<-res2[!is.na(res2)]
+      if(any(res2=="Alt allele reads present" )) {
+        return("Alt allele reads present")
+      } else {
+        max_reads=max(df$n_ref_reads_supporting[df$SNP_site%in%het_SNP_sites])
+        return(paste("Alt allele not confirmed with maximum of",max_reads,"reads supporting the other allele"))
+      } 
+    }
+  })
+  return(res)
+}
+
+#This function checks the phasing of the positive subclades of the PVV to see if they match
+extract_PVV_pos_clade_phasing_summary=function(list) {
+  if(class(list)!="list") {
+    stop(return("No result"))
+  } else if(is.null(list$positive_subclade_res)) {
+    stop(return("No result"))
+  } else {
+    res_pos<-list$positive_subclade_res
+  }
+  
+  if(class(res_pos)=="character") {
+    stop(return(res_pos))
+  } else if(class(res_pos)=="list"){
+    res_pos_vec=unlist(res_pos)
+  }
+  
+  if(length(res_pos_vec)==1) {
+    stop(return(res_pos_vec))
+  } else if(length(unique(res_pos_vec))==1) {
+    return(res_pos_vec[1])
+  } else {
+    if(any(res_pos_vec=="Same phasing confirmed")) {
+      return("Same phasing confirmed in at least one subclade")
+    } else if(any(res_pos_vec=="Non-matching phasing confirmed")) {
+      return("Non-matching phasing confirmed in at least one subclade")
+    } else {
+      return("Unable to confirm phasing")
+    }
+  }
+}
+
+#This function examines the read counts of the negative subclades of the PVV to see if they include reads that match
+#the phasing of the mutant allele in the positive subclades. If they do this means (1) there is no LOH, (2) both alleles have been sequenced
+extract_PVV_neg_clade_phasing_summary=function(list) {
+  if(class(list)!="list") {
+    stop(return("No result"))
+  } else if(is.null(list$positive_subclade_res)) {
+    stop(return("No result"))
+  } else {
+    res_neg<-list$negative_subclade_res
+  }
+  
+  if(class(res_neg)=="character") {
+    stop(return(res_neg))
+  } else if(class(res_neg)=="list"){
+    res_neg_vec=unlist(res_neg)
+  }
+  
+  if(length(res_neg_vec)==1) {
+    res<-res_neg_vec
+  } else if(length(unique(res_neg_vec))==1) {
+    res<-res_neg_vec[1]
+  } else if(any(res_neg_vec=="Both alleles confirmed with reference allele")){
+    res<-"Both alleles confirmed with reference allele in at least one subclade"
+  } else {
+    res<-res_neg_vec
+  } 
+  
+  if(any(res=="May have biased allele sequencing or LOH - suggest further confirmation")) {
+    pos_clades=which(names(list$phasing_info_by_subclade)=="pure_positive")
+    het_SNPs=return_het_SNPs_from_positive_clades(list$phasing_info_by_subclade[pos_clades])
+    print(het_SNPs)
+    if(!is.null(het_SNPs)) {
+      alt_bases<-sapply(het_SNPs,function(SNP) {get_alt_base(SNP,list$phasing_info_by_subclade[pos_clades])})
+      if(all(alt_bases=="Conflicting results")) {
+        stop(return("Positive clades have non-matching phasing"))
+      }
+      alt_bases<-alt_bases[!alt_bases=="Conflicting results"]
+      neg_clades=which(names(list$phasing_info_by_subclade)=="pure_negative")
+      res<-unlist(assess_presence_of_alt_allele(alt_bases,list$phasing_info_by_subclade[neg_clades]))
+    } else {
+      res<-"No nearby heterozygous SNPs to confirm"
+    }
+  }
+  return(res) 
+}
+
