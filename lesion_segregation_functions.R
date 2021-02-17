@@ -439,7 +439,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
         print("Existing phasing files found in specified output directory")
       }
       if(file.exists(phasing_output_file)&file.info(phasing_output_file)$size!=0){
-        phasing=read.table(phasing_output_file,header = T)
+        phasing=read.table(phasing_output_file,header = T,stringsAsFactors = F,colClasses="character")
       } else {
         print("Unable to run phasing script")
         phasing=NA
@@ -462,7 +462,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
         print("Existing phasing files found in specified output directory")
       }
       if(file.exists(phasing_output_file)&file.info(phasing_output_file)$size!=0){
-        phasing=read.table(phasing_output_file,header = T)
+        phasing=read.table(phasing_output_file,header = T,stringsAsFactors = F,colClasses="character")
       } else {
         phasing="Unable to run phasing script"
       }
@@ -504,7 +504,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
-      basects=read.table(basects_output_file,header = T)
+      basects=read.table(basects_output_file,header = T,stringsAsFactors = F)
       return(basects)
     })
   } else if(is.data.frame(project)) {
@@ -521,7 +521,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       } else if(verbose) {
         print("Existing phasing files found in specified output directory")
       }
-      basects=read.table(basects_output_file,header = T)
+      basects=read.table(basects_output_file,header = T,stringsAsFactors = F)
       return(basects)
     })
   }
