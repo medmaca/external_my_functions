@@ -530,7 +530,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
 }
 
 get_clade_base_counts=function(nodes,tree,Chrom,Pos,project,ref_sample_set,phasing_output_dir,distance=1000,force_rerun=F) {
-  clade_base_counts_list=lapply(nodes,function(node) {samples=getTips(tree=tree,node=node);base_counts_list=get_base_counts_list(samples=samples,Chrom=Chrom,Pos=Pos,project=sample_info$project,tree=tree,output_dir = phasing_output_dir,ref_sample_set = ref_sample_set,distance=distance,force_rerun = force_rerun);return(base_counts_list)})
+  clade_base_counts_list=lapply(nodes,function(node) {samples=getTips(tree=tree,node=node);base_counts_list=get_base_counts_list(samples=samples,Chrom=Chrom,Pos=Pos,project=project,tree=tree,output_dir = phasing_output_dir,ref_sample_set = ref_sample_set,distance=distance,force_rerun = force_rerun);return(base_counts_list)})
   aggregated_clade_base_counts_list=lapply(clade_base_counts_list,function(list) {
     chrom_pos_df=list[[1]][,c(2,3)] #Get the co-ordinates of apparent het SNPs from the 1st in the list
     list_mod=lapply(list,function(df) {res<-left_join(chrom_pos_df,df[,-1],by=c("Chr","Pos"));res[is.na(res)]<-0;return(res[,3:7])}) #Now get just the base counts at these sites
