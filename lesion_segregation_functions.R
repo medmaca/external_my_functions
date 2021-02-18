@@ -429,7 +429,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
             }
           })
           #Now run using the modified julia script to use these local files
-          command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams","1000",phasing_output_file,basects_output_file,ref_sample_set)
+          command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams",as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
           system(command) 
         } else {
           command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
@@ -495,7 +495,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
             }
           })
           #Now run using the modified julia script to use these local files
-          command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams","1000",phasing_output_file,basects_output_file,ref_sample_set)
+          command=paste("julia DRIVER_phasing_specify_BAM_directory.jl",Chrom,Pos,sample,"/lustre/scratch119/casm/team154pc/ms56/my_programs/Mike_phasing/new_bams",as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
           system(command) 
         } else {
           command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
