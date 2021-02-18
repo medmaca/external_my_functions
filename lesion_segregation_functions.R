@@ -529,33 +529,75 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
   return(basects_list)
 }
 
-check_matching_phasing=function(phasing_info1,phasing_info2) {
+get_clade_base_counts=function(nodes,tree,Chrom,Pos,project,ref_sample_set,phasing_output_dir,distance=1000,force_rerun=F) {
+  clade_base_counts_list=lapply(nodes,function(node) {samples=getTips(tree=tree,node=node);base_counts_list=get_base_counts_list(samples=samples,Chrom=Chrom,Pos=Pos,project=sample_info$project,tree=tree,output_dir = phasing_output_dir,ref_sample_set = ref_sample_set,distance=distance,force_rerun = force_rerun);return(base_counts_list)})
+  aggregated_clade_base_counts_list=lapply(clade_base_counts_list,function(list) {
+    chrom_pos_df=list[[1]][,c(2,3)] #Get the co-ordinates of apparent het SNPs from the 1st in the list
+    list_mod=lapply(list,function(df) {res<-left_join(chrom_pos_df,df[,-1],by=c("Chr","Pos"));res[is.na(res)]<-0;return(res[,3:7])}) #Now get just the base counts at these sites
+    counts_df=Reduce(function(df1,df2) {return(df1+df2)},list_mod) #Aggregate these across a pure subclade
+    return(cbind(chrom_pos_df,counts_df))
+  })
+  return(aggregated_clade_base_counts_list)
+}
+
+return_heterozygous_SNPs=function(base_counts_list) {
+  pos_het_res=lapply(base_counts_list,function(df) {
+    if(nrow(df)==0) {stop(return(NA))}
+    het_SNPs=apply(df[,3:7],1,function(x) {
+      counts=x; sum_counts=sum(x)
+      if(sum_counts==0) {stop(return(NA))}
+      het_test=sapply(counts,function(y) return(binom.test(x=y,n=sum_counts)$p.value))
+      absent_test=sapply(counts,function(y) return(binom.test(x=y,n=sum_counts,p=0.01)$p.value))
+      hom_test=sapply(counts,function(y) return(binom.test(x=y,n=sum_counts,p=0.99)$p.value))
+      lik_hom=prod(pmax(hom_test,absent_test))
+      lik_het=prod(pmax(het_test,absent_test))
+      if(lik_het>lik_hom) {return(T)} else {return(F)}
+    })
+    return(het_SNPs)
+  })
+  positions=base_counts_list[[1]]$Pos
+  het_positions=positions[Reduce(function(x,y) {x&y},pos_het_res)]
+  return(het_positions)
+}
+
+check_matching_phasing=function(phasing_info1,phasing_info2,het_positions=NULL) {
   if(any(sapply(list(phasing_info1,phasing_info2),is.logical))) {
     result<-"Unable to confirm phasing"
   } else {
     comb_df=inner_join(phasing_info1,phasing_info2,by="SNP_site")
     comb_df$depth=comb_df$n_alt_reads_supporting.x+comb_df$n_alt_reads_supporting.y+comb_df$n_ref_reads_supporting.x+comb_df$n_ref_reads_supporting.y
     
-    #Test if the called SNPs appear real
-    true_het1<-comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.x
-    true_het2<-comb_df$alt_phases_with_base.y!=comb_df$ref_phases_with_base.y
-    het_test=mapply(FUN=function(x,y) {vec=c(x,y);vec<-vec[!is.na(vec)];if(length(vec)==0) {return(T)} else if(all(vec)) {return(T)} else {return(F)}},x=true_het1,y=true_het2)
-    
-    #If no true het SNPs, stop function; else filter the comb_df
-    if(!any(het_test)) {
-      stop(return("No SNPs appear to be heterozygous"))
+    #Test if the called SNPs appear real, or if previously tested on the basects data, filter the included SNPs based on this
+    if(is.null(het_positions)) {
+      true_het1<-comb_df$alt_phases_with_base.x!=comb_df$ref_phases_with_base.x
+      true_het2<-comb_df$alt_phases_with_base.y!=comb_df$ref_phases_with_base.y
+      het_test=mapply(FUN=function(x,y) {vec=c(x,y);vec<-vec[!is.na(vec)];if(length(vec)==0) {return(T)} else if(all(vec)) {return(T)} else {return(F)}},x=true_het1,y=true_het2)
+      
+      #If no true het SNPs, stop function; else filter the comb_df
+      if(!any(het_test)) {
+        stop(return("No SNPs appear to be heterozygous"))
+      } else {
+        comb_df<-comb_df[het_test,]
+      }
+      
+      #Although heterozygosity is likely after the above test, it is not confirmed. Test for this:
+      het_confirmed=apply(comb_df[,c("ref_phases_with_base.x","ref_phases_with_base.y","alt_phases_with_base.x","alt_phases_with_base.y")],1,function(x) length(unique(x[!is.na(x)]))>1)
+      if(any(het_confirmed)) {
+        comb_df<-comb_df[het_confirmed,]
+        het_not_confirmed<-F
+      } else {
+        het_not_confirmed<-T
+      }
+      
     } else {
-      comb_df<-comb_df[het_test,]
-    }
-    
-    #Although heterozygosity is likely after the above test, it is not confirmed. Test for this:
-    het_confirmed=apply(comb_df[,c("ref_phases_with_base.x","ref_phases_with_base.y","alt_phases_with_base.x","alt_phases_with_base.y")],1,function(x) length(unique(x[!is.na(x)]))>1)
-    if(any(het_confirmed)) {
-      comb_df<-comb_df[het_confirmed,]
+      snp_positions=as.numeric(str_split(pattern=":",comb_df$SNP_site,simplify=T)[,2])
+      comb_df<-comb_df[snp_positions%in%het_positions,]
+      if(nrow(comb_df)==0) {
+        stop(return("No SNPs appear to be heterozygous"))
+      }
       het_not_confirmed<-F
-    } else {
-      het_not_confirmed<-T
     }
+    
     
     #Test for either alt matching alt, or ref matching ref for any individual SNP
     matching_res=list(Matching_alt_phasing=comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y,
@@ -1015,4 +1057,5 @@ extract_PVV_neg_clade_phasing_summary=function(list) {
   }
   return(res) 
 }
+
 
