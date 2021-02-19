@@ -482,7 +482,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       phasing_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_phasing.txt")
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample));print(paste("Reference sample set chosen as",ref_sample_set))}
-      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
+      if(!file.exists(basects_output_file)|file.info(basects_output_file)$size==0|force_rerun) {
         if(grepl("PD44579b",sample)) {
           #Import all the necessary bams with edited headers
           sapply(c(sample,unlist(strsplit(ref_sample_set,","))),function(bam_sample) {
@@ -515,7 +515,7 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       sample_project=project$project[project$sample==sample]
       set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",") #Define a random set of samples (in the same project) from the tree used for finding heterozgous SNPs in the .jl phasing script
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
-      if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
+      if(!file.exists(basects_output_file)|file.info(basects_output_file)$size==0|force_rerun) {
         command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
@@ -770,36 +770,43 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/MSC_BMT/Samples_project_reference.csv",header=T)
     project<-project[,c("Sample","Project")]
     colnames(project)<-c("sample","project")
+    sex=NA
   } else if(dataset=="EM") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_standard_rho01.tree")
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_standard_rho01")
     project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/EM/Samples_project_ref.csv",header=T)
-    project_ref<-project_ref[,c(1,3)]
-    colnames(project_ref)<-c("sample","project")
+    project_ref<-project_ref[,c(1,3,6)]
+    colnames(project_ref)<-c("sample","project","sex")
     sample=substr(Sample_ID,1,5)
     project=as.numeric(project_ref$project[project_ref$sample==sample])
+    sex=project_ref$sex[project_ref$sample==sample]
   } else if(dataset=="KY") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"_rmix_consense_tree_no_branch_lengths_1811.tree") 
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Filtered_muts_",Sample_ID)
     project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/KY/Samples_project_ref_KY.csv",header=T)
     project=as.numeric(project_ref$project[project_ref$sample==Sample_ID])
+    sex=NA
   } else if(dataset=="MSC_BMT") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_pval_post_mix.tree")
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_pval_post_mix")
     project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/MSC_BMT/Samples_project_reference.csv",header=T)
     project<-project[,c("Sample","Project")]
     colnames(project)<-c("sample","project")
+    sex_vec=c(Pair11="male",Pair13="male",Pair21="male",Pair28="female",Pair31="male",Pair40="male")
+    sex=sex_vec[Sample_ID]
   } else if(dataset=="PR") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"/snp_tree_with_branch_length_polytomised.tree")
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"/Filtered_muts_",Sample_ID)
     project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/PR/Samples_project_ref_PR.csv",header=T)
     project<-project[,c("sample","project")]
+    sex=NA
   } else if(dataset=="MF"){
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_noMixed.tree")
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/filtered_muts_",Sample_ID,"_noMixed")
     project=2305
+    sex=NA
   }
-  return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project))
+  return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project,sex=sex))
 }
 
 #Combining the MAVs into a consensus Ref and Alt covering the same positions is complicated by the fact that they may report slightly different sequences (e.g. if one is an SNV and the other an MNV)
@@ -1058,4 +1065,40 @@ extract_PVV_neg_clade_phasing_summary=function(list) {
   return(res) 
 }
 
+#ASCAT copy number functions
+get_cn=function(cn_summary_file){
+  ##cat("opening ",cn_summary_file,"\n")
+  if(!file.exists(cn_summary_file)){
+    warning(sprintf("%s: does not exist",cn_summary_file))
+    return(NULL)
+  }
+  cn=read.csv(cn_summary_file,header = FALSE)
+  cn$start=cn$V3
+  cn$end=cn$V4
+  cn$chr=cn$V2
+  ###V7=total copy number
+  ## V8=minor allele copy number
+  cn$major=cn$V7-cn$V8
+  cn$minor=cn$V8
+  cn[,-grep("^V",colnames(cn))]
+}
+get_ASCAT_minor_allele_cn=function(Chrom,Pos,sample,project){
+  if(is.data.frame(project)) {
+    project<-project$project[project$sample==sample]
+  }
+  file = paste0("/nfs/cancer_ref01/nst_links/live/", project, "/", sample, "/", sample, ".ascat_ngs.summary.csv")
+  cn=get_cn(file)
+  if(!is.null(cn)) {
+    minor_allele_cn=cn$minor[cn$chr==Chrom & cn$start<Pos & cn$end>Pos]
+    return(minor_allele_cn)
+  } else {
+    return(NULL)
+  }
+}
 
+get_mean_ASCAT_minor_allele_cn=function(Chrom,Pos,samples,project) {
+  cn_vec=sapply(samples, function(sample) {
+    cn=get_ASCAT_minor_allele_cn(Chrom = Chrom,Pos=Pos,sample=sample,project=project)
+  })
+  return(mean(cn_vec,na.rm = T))
+}
