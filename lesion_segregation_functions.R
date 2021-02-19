@@ -775,11 +775,11 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_standard_rho01.tree")
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_standard_rho01")
     project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/EM/Samples_project_ref.csv",header=T)
-    project_ref<-project_ref[,c(1,3,6)]
-    colnames(project_ref)<-c("sample","project","sex")
+    project_ref<-project_ref[,c(1,3)]
+    colnames(project_ref)<-c("sample","project")
     sample=substr(Sample_ID,1,5)
     project=as.numeric(project_ref$project[project_ref$sample==sample])
-    sex=project_ref$sex[project_ref$sample==sample]
+    sex=NA
   } else if(dataset=="KY") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"_rmix_consense_tree_no_branch_lengths_1811.tree") 
     filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/Filtered_muts_",Sample_ID)
