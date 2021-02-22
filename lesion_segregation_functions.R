@@ -719,8 +719,9 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   if(sum(types=="mixed")>1) {
     stop(return("More than one mixed subclade identified - indicative that not caused by a persistent DNA lesion"))
   } else if(length(unique(types))==1){
-    stop(return("Not PVV"))  
-    }
+    stop(return(ifelse(test_type=="PVV","Not PVV","Not MAV")))  
+  }
+  
   names(lesion_children)<-types
   pure_subclades=lesion_children[names(lesion_children)!="mixed"]
   
@@ -1111,5 +1112,6 @@ get_mean_ASCAT_minor_allele_cn=function(Chrom,Pos,samples,project) {
     cn=get_ASCAT_minor_allele_cn(Chrom = Chrom,Pos=Pos,sample=sample,project=project)
     return(cn)
   })
+  #print(cn_vec)
   return(mean(cn_vec,na.rm = T))
 }
