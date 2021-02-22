@@ -706,7 +706,11 @@ get_pure_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   lesion_children=get_node_children(lesion_node,tree=tree)
   if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
     print("Removing polytomy")
-    keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(any(mut_df$pos_test[mut_df$clades%in%nodes]))})
+    if(test_type=="PVV") {
+      keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(any(mut_df$pos_test[mut_df$clades%in%nodes]))})
+    } else {
+      keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(any(mut_df$mut1_pos_test[mut_df$clades%in%nodes])|any(mut_df$mut2_pos_test[mut_df$clades%in%nodes]))})
+    }
     lesion_children<-lesion_children[keep_children]
   }
   
@@ -747,7 +751,11 @@ get_mixed_subclades=function(mut1,mut2=NULL,lesion_node,tree,matrices) {
   lesion_children=get_node_children(lesion_node,tree=tree)
   if(length(lesion_children)>2) { #if initial_lesion_node is at site of polytomy, drop the negative branches of the polytomy
     print("Removing polytomy")
-    keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(!all(mut_df$neg_test[mut_df$clades%in%nodes]))})
+    if(test_type=="PVV") {
+      keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(any(mut_df$pos_test[mut_df$clades%in%nodes]))})
+    } else {
+      keep_children=sapply(lesion_children, function(node) {nodes=c(node,get_all_node_children(node,tree=tree)); return(any(mut_df$mut1_pos_test[mut_df$clades%in%nodes])|any(mut_df$mut2_pos_test[mut_df$clades%in%nodes]))})
+    }
     lesion_children<-lesion_children[keep_children]
   }
   
@@ -1084,21 +1092,24 @@ get_cn=function(cn_summary_file){
 }
 get_ASCAT_minor_allele_cn=function(Chrom,Pos,sample,project){
   if(is.data.frame(project)) {
-    project<-project$project[project$sample==sample]
+    sample_project<-project$project[project$sample==sample]<-project$project[project$sample==sample]
+  } else {
+    sample_project<-project
   }
-  file = paste0("/nfs/cancer_ref01/nst_links/live/", project, "/", sample, "/", sample, ".ascat_ngs.summary.csv")
+  file = paste0("/nfs/cancer_ref01/nst_links/live/", sample_project, "/", sample, "/", sample, ".ascat_ngs.summary.csv")
   cn=get_cn(file)
   if(!is.null(cn)) {
     minor_allele_cn=cn$minor[cn$chr==Chrom & cn$start<Pos & cn$end>Pos]
     return(minor_allele_cn)
   } else {
-    return(NULL)
+    return(NA)
   }
 }
 
 get_mean_ASCAT_minor_allele_cn=function(Chrom,Pos,samples,project) {
   cn_vec=sapply(samples, function(sample) {
     cn=get_ASCAT_minor_allele_cn(Chrom = Chrom,Pos=Pos,sample=sample,project=project)
+    return(cn)
   })
   return(mean(cn_vec,na.rm = T))
 }
