@@ -320,6 +320,7 @@ get_filtered_mut_set = function(input_set_ID,
                                 ##PARAMETERS FOR FILTERING THE MUTATION SET. These arguments set the cut-offs for selecting the set of "true somatic mutations"
                                 #NB. If parameter is set to NA, filter will not be applied.
                                 retain_muts = NA, #vector of "mut_refs" (in format Chrom-Pos-Ref-Alt) to retain even if fail the filtering
+                                exclude_muts = NA, #vector of "mut_refs" (in format Chrom-Pos-Ref-Alt) to exclude even if pass the filtering
                                 germline_pval = -10,  
                                 rho = 0.1, #Beta-binomial filter, rho value cut-off (i.e. rho must be > cut-off)
                                 mean_depth=NA, #Numeric vector of length 4 in the order (1) AUTO min depth cutoff, (2) AUTO max depth cutoff, (3) XY min depth cutoff, (4) XY max depth cutoff
@@ -389,7 +390,7 @@ get_filtered_mut_set = function(input_set_ID,
   SIMPLIFY = F)
   
   filter_pass=Reduce(cbind,out);rownames(filter_pass)<-rownames(filter_params);colnames(filter_pass)<-var_name #Combine the output & name the rows
-  select_muts = apply(filter_pass,1, function(x) all(x == 1))|rownames(filter_pass) %in% retain_muts #Select the mutations for output. These must pass ALL the applied filters.
+  select_muts = (apply(filter_pass,1, function(x) all(x == 1))&!rownames(filter_pass)%in%exclude_muts)|rownames(filter_pass) %in% retain_muts #Select the mutations for output. These must pass ALL the applied filters.
   filter_code = apply(filter_pass, 1, paste, collapse = "-") #Save a "filter_code" vector. This can be used as a quick test for which filter is removing most mutations.
   COMB_mats.tree.build = list_subset(COMB_mats, select_vector = select_muts) #Subset matrices to include only the PASS mutations
   

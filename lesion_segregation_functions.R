@@ -101,8 +101,8 @@ create_PVV_filter_table=function(mutations_to_test,details,tree,matrices,look_ba
     
     #Apply beta-binomial filter to these counts to get sense of overdispersion
     NR_pos[NR_pos==0]<-1; NR_neg[NR_neg==0]<-1 #Set sites with 0 depth to a depth of 1
-    pos_rho=findrho(NV_vec=NV_pos,NR_vec=NR_pos)
-    neg_rho=findrho(NV_vec=NV_neg,NR_vec=NR_neg)
+    pos_rho=estimateRho_gridml(NV_vec=NV_pos,NR_vec=NR_pos)
+    neg_rho=estimateRho_gridml(NV_vec=NV_neg,NR_vec=NR_neg)
     
     #Additional filters to check not just for overdispersion, but that at least one clade unexpectedly truly negative or positive
     pos_test=any(NV_pos==0 & NR_pos>=10) #is there at least one "WT" sub-clade with zero variant reads with a depth of ≥ 10
