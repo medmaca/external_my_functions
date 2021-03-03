@@ -641,4 +641,84 @@ check_for_false_germline_calls = function(tree,
   }
 }
 
+add_ancestral_outgroup=function(tree,outgroup_name="Ancestral"){
+  tmp=tree$edge
+  N=length(tree$tip.label)
+  ##Renumber what was root->max+1
+  ##Renumber the node with the sameid as new root as max+2
+  renamedroot=max(tmp+1)
+  tmp=ifelse(tmp==N+1,renamedroot,tmp)
+  ##tmp[which(tmp[,1]==(N+1)),1]=renamedroot
+  tmp=ifelse(tmp==N+2,renamedroot+1,tmp)
+  ##Increment tips by 1
+  tmp[,2]=ifelse(tmp[,2]<=N,tmp[,2]+1,tmp[,2])
+  
+  tree$edge=rbind(matrix(c(N+2,N+2,renamedroot,1),ncol=2,byrow  = FALSE),tmp)
+  tree$edge.length=c(0,0,tree$edge.length)
+  
+  tree$tip.label=c(outgroup_name,tree$tip.label)
+  tree$Nnode=tree$Nnode+1
+  mode(tree$Nnode)="integer"
+  mode(tree$edge)="integer"
+  tree
+}
+
+assign_mutations_to_branches=function(tree,filtered_muts,keep_ancestral=T,create_multi_tree=T,p.error.value=0.01,treefit_pval_cutoff=1e-3) {
+  tree=drop.tip(tree,"Ancestral")
+  if(!keep_ancestral) {
+    print("Assigning mutation without an ancestral branch")
+    tree <- multi2di(tree)
+    tree$edge.length = rep(1, nrow(tree$edge)) #Initially need to assign edge lengths of 1 for the tree_muts package to work
+    
+    #ASSIGN MUTATIONS TO THE TREE USING THE TREE_MUT PACKAGE
+    df = reconstruct_genotype_summary(tree) #Define df (data frame) for treeshape
+    
+    #Get matrices in order, and run the main assignment functions
+    mtr = filtered_muts$COMB_mats.tree.build$NV; mtr = as.matrix(mtr)
+    depth = filtered_muts$COMB_mats.tree.build$NR; depth = as.matrix(depth)
+    p.error = rep(p.error.value, ncol(filtered_muts$COMB_mats.tree.build$NR))
+    res = assign_to_tree(mtr[,df$samples], depth[,df$samples], df, error_rate = p.error) #Get res (results!) object
+    
+  } else {
+    print("Assigning mutation with an ancestral branch")
+    tree <- multi2di(tree)
+    tree <- add_ancestral_outgroup(tree) #Re add the ancestral outgroup after making tree dichotomous - avoids the random way that baseline polytomy is resolved
+    tree$edge.length = rep(1, nrow(tree$edge)) #Initially need to assign edge lengths of 1 for the tree_muts package to work
+    
+    #ASSIGN MUTATIONS TO THE TREE USING THE TREE_MUT PACKAGE
+    df = reconstruct_genotype_summary(tree) #Define df (data frame) for treeshape
+    
+    #Get matrices in order, and run the main assignment functions
+    mtr = filtered_muts$COMB_mats.tree.build$NV; mtr$Ancestral=0; mtr = as.matrix(mtr)
+    depth = filtered_muts$COMB_mats.tree.build$NR; depth$Ancestral=10; depth = as.matrix(depth)
+    p.error = c(rep(p.error.value, ncol(filtered_muts$COMB_mats.tree.build$NR)),1e-6)
+    res = assign_to_tree(mtr[,df$samples], depth[,df$samples], df, error_rate = p.error) #Get res (results!) object
+  }
+  
+  if(create_multi_tree){
+    print("Converting to a multi-furcating tree structure")
+    tree$edge.length <- res$df$df$edge_length #Assign edge lengths from the initial res object
+    #Maintain the dichotomy with the ancestral branch
+    if(keep_ancestral) {
+      ROOT=tree$edge[1,1]
+      current_length<-tree$edge.length[tree$edge[,1]==ROOT & tree$edge[,2]!=1]
+      new_length<-ifelse(current_length==0,1,current_length)
+      tree$edge.length[tree$edge[,1]==ROOT & tree$edge[,2]!=1]<-new_length
+    }
+    tree<-di2multi(tree) #Now make tree multifurcating
+    df = reconstruct_genotype_summary(tree) #Define df (data frame) for new treeshape
+    
+    #Re-run the mutation assignment algorithm from the new tree
+    res = assign_to_tree(mtr[,df$samples], depth[,df$samples], df, error_rate = p.error) #Get res (results!) object
+  }
+  
+  #Add the tree to the res object
+  res$tree<-tree
+  
+  #See how many mutations are "poor fit"
+  poor_fit = res$summary$pval < treefit_pval_cutoff  #See how many mutations don't have read counts that fit the tree very well
+  print(paste(sum(poor_fit),"mutations do not have read counts that fit any tree branch well"))
+  return(res)
+}
+
 
