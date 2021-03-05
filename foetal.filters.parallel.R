@@ -601,8 +601,11 @@ check_for_false_germline_calls = function(tree,
     return(root_clade_samples)
   }
   
-  root_clades=get_root_clades(tree)
-  nsamp=length(tree$tip.label)
+  #Drop the ancestral tip if present, as this messes up the "get_root_clades" function
+  tree.noancestral<-drop.tip(tree,"Ancestral")
+  
+  root_clades=get_root_clades(tree.noancestral)
+  nsamp=length(tree.noancestral$tip.label)
   which_small=sapply(root_clades,length)<max_clade_prop*nsamp
   root_clades[!which_small]<-NULL
   
