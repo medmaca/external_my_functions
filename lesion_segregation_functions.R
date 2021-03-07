@@ -502,9 +502,13 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
           system(command) 
         }
       } else if(verbose) {
-        print("Existing phasing files found in specified output directory")
+        print("Existing base counts files found in specified output directory")
       }
-      basects=read.table(basects_output_file,header = T,stringsAsFactors = F)
+      if(file.exists(basects_output_file)&file.info(basects_output_file)$size!=0){
+        basects=read.table(basects_output_file,header = T,stringsAsFactors = F)
+      } else {
+        basects="Unable to run phasing script"
+      }
       return(basects)
     })
   } else if(is.data.frame(project)) {
@@ -519,9 +523,13 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
         command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
         system(command)
       } else if(verbose) {
-        print("Existing phasing files found in specified output directory")
+        print("Existing base counts files found in specified output directory")
       }
-      basects=read.table(basects_output_file,header = T,stringsAsFactors = F)
+      if(file.exists(basects_output_file)&file.info(basects_output_file)$size!=0){
+        basects=read.table(basects_output_file,header = T,stringsAsFactors = F)
+      } else {
+        basects="Unable to run phasing script"
+      }
       return(basects)
     })
   }
