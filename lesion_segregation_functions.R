@@ -10,15 +10,6 @@ get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor 
   return(curr)
 }
 
-get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor (i.e. the direct parent) use degree=1.  Use higher degrees to go back several generations.
-  curr<-node
-  for(i in 1:degree){
-    curr=tree$edge[which(tree$edge[,2]==curr),1]
-    if(curr==(1+length(tree$tip.label))) {stop(return(curr))}
-  }
-  return(curr)
-}
-
 #Function for Nick's alternative rho estimation approach (faster)
 loglik=function(par,nmuts,depth){
   idx=which(!is.na(nmuts/depth))
@@ -983,7 +974,9 @@ get_alt_base=function(SNP,positive_subclade_phasing_info) {
 assess_presence_of_alt_allele=function(alt_bases,negative_subclade_phasing_info) {
   het_SNP_sites=names(alt_bases)
   res=lapply(negative_subclade_phasing_info,function(df) {
-    if(class(df)=="logical"|!any(het_SNP_sites%in%df$SNP_site)) {
+    if(class(df)=="logical") {
+      return("Alt allele not confirmed")
+    } else if(!any(het_SNP_sites%in%df$SNP_site)) {
       return("Alt allele not confirmed")
     } else {
       res2=sapply(het_SNP_sites,function(SNP) {
@@ -1048,7 +1041,7 @@ extract_PVV_pos_clade_phasing_summary=function(list) {
 extract_PVV_neg_clade_phasing_summary=function(list) {
   if(class(list)!="list") {
     stop(return("No result"))
-  } else if(is.null(list$positive_subclade_res)) {
+  } else if(is.null(list$negative_subclade_res)) {
     stop(return("No result"))
   } else {
     res_neg<-list$negative_subclade_res
@@ -1073,7 +1066,7 @@ extract_PVV_neg_clade_phasing_summary=function(list) {
   if(any(res=="May have biased allele sequencing or LOH - suggest further confirmation")) {
     pos_clades=which(names(list$phasing_info_by_subclade)=="pure_positive")
     het_SNPs=return_het_SNPs_from_positive_clades(list$phasing_info_by_subclade[pos_clades])
-    print(het_SNPs)
+    #print(het_SNPs)
     if(!is.null(het_SNPs)) {
       alt_bases<-sapply(het_SNPs,function(SNP) {get_alt_base(SNP,list$phasing_info_by_subclade[pos_clades])})
       if(all(alt_bases=="Conflicting results")) {
@@ -1124,6 +1117,7 @@ get_ASCAT_minor_allele_cn=function(Chrom,Pos,sample,project){
 
 get_mean_ASCAT_minor_allele_cn=function(Chrom,Pos,samples,project) {
   cn_vec=sapply(samples, function(sample) {
+    #print(sample)
     cn=get_ASCAT_minor_allele_cn(Chrom = Chrom,Pos=Pos,sample=sample,project=project)
     return(cn)
   })

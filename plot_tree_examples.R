@@ -567,6 +567,16 @@ plot_d_or_r_tip_point = function(sample,tree,details,donor_ID,recip_ID,cols=c("d
   points(x=info$x,y=info$yb,type="p",pch=20,bg=tip_col,col=tip_col)
 }
 
+plot_category_tip_point = function(sample,tree,details=NULL,cat_df,cols=RColorBrewer::brewer.pal(8,"Set1")) {
+  cols=cols[1:length(unique(cat_df$cat))]
+  names(cols)<-unique(cat_df$cat)
+  
+  node=which(tree$tip.label==sample)
+  info=get_edge_info(tree,details,node)
+  tip_col=cols[cat_df$cat[cat_df$sample==sample]]
+  points(x=info$x,y=info$yb,type="p",pch=20,bg=tip_col,col=tip_col)
+}
+
 plot_sharing_info=function(tree,details,matrices,node,sharing_cols=c("black","dark green","red"),...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
   stopifnot(exists("donor_ID"),exists("recip_ID"))
   info=get_edge_info(tree,details,node=node)
