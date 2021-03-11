@@ -1013,7 +1013,39 @@ assess_presence_of_alt_allele=function(alt_bases,negative_subclade_phasing_info)
   return(res)
 }
 
-#This function checks the phasing of the positive subclades of the PVV to see if they match
+#This function extracts the positive subclade phasing info results from the results list
+extract_MAV_pos_clade_phasing_summary=function(list) {
+  if(class(list)!="list") {
+    stop(return("No result"))
+  } else if(is.null(list$positive_subclade_res)) {
+    stop(return("No result"))
+  } else {
+    res<-list$positive_subclade_res
+  }
+  
+  if(class(res)=="character") {
+    stop(return(res))
+  } else if(class(res)=="list"){
+    res_vec=unlist(res)
+  }
+  
+  if(length(res_vec)==1) {
+    stop(return(res_vec))
+  } else if(length(unique(res_vec))==1) {
+    return(res_vec[1])
+  } else {
+    res_vec_MAV<-res_vec[grepl("pure_mut1",names(res_vec))&grepl("pure_mut2",names(res_vec))]
+    if(length(res_vec_MAV)==0) {
+      stop(return("Unable to confirm phasing"))
+    } else if(any(res_vec_MAV=="Same phasing confirmed")) {
+      return("Same phasing confirmed")
+    } else {
+      return("Unable to confirm phasing")
+    }
+  }
+}
+
+#This function extracts the positive subclade phasing info results from the results list
 extract_PVV_pos_clade_phasing_summary=function(list) {
   if(class(list)!="list") {
     stop(return("No result"))
@@ -1059,6 +1091,8 @@ extract_PVV_neg_clade_phasing_summary=function(list) {
     stop(return(res_neg))
   } else if(class(res_neg)=="list"){
     res_neg_vec=unlist(res_neg)
+  } else if(is.na(res_neg)) {
+    stop(return(NA))
   }
   
   if(length(res_neg_vec)==1) {
@@ -1072,7 +1106,7 @@ extract_PVV_neg_clade_phasing_summary=function(list) {
   } 
   
   if(any(res=="May have biased allele sequencing or LOH - suggest further confirmation")) {
-    pos_clades=which(names(list$phasing_info_by_subclade)=="pure_positive")
+    pos_clades=which(names(list$phasing_info_by_subclade)%in%c("pure_positive","pure_mut1","pure_mut2"))
     het_SNPs=return_het_SNPs_from_positive_clades(list$phasing_info_by_subclade[pos_clades])
     #print(het_SNPs)
     if(!is.null(het_SNPs)) {
@@ -1083,6 +1117,14 @@ extract_PVV_neg_clade_phasing_summary=function(list) {
       alt_bases<-alt_bases[!alt_bases=="Conflicting results"]
       neg_clades=which(names(list$phasing_info_by_subclade)=="pure_negative")
       res<-unlist(assess_presence_of_alt_allele(alt_bases,list$phasing_info_by_subclade[neg_clades]))
+      res<-unique(res)
+      if(length(res)>1) {
+        if(any(res=="Alt allele reads present")) {
+          res<-"Alt allele reads present in at least one subclade"
+        } else {
+          res<-paste(res,collapse=",")
+        }
+      }
     } else {
       res<-"No nearby heterozygous SNPs to confirm"
     }
