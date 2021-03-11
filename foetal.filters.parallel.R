@@ -624,14 +624,15 @@ check_for_false_germline_calls = function(tree,
       NV_outlier=apply(COMB_mats$NV[germline_filtered,outlier_sample_group,drop=F],1,sum)
       
       outlier_pvals=mapply(FUN=function(NV,NR) {if(NR==0){return(1)}else{binom.test(NV,NR,alternative="less")$p.value}},NV=NV_outlier,NR=NR_outlier)
-      hist(log10(outlier_pvals),breaks=50,main="Unadjusted p-values for mutations being present in outlier group") #Review the p-value histogram - any clear low outliers?
+      outlier_pval.adj=p.adjust(outlier_pvals,method = "BH")
+      #hist(log10(outlier_pvals),breaks=50,main="Unadjusted p-values for mutations being present in outlier group") #Review the p-value histogram - any clear low outliers?
       
       #Test for germline filtered mutations that are likely to be absent (with Bon-Ferroni correction for multiple testing)
-      any_convincing=sum(outlier_pvals<0.05/length(germline_filtered) & NV_outlier==0) #Check for any absent, with multiple testing (B-F) correction
+      any_convincing=sum(outlier_pval.adj<0.05 & NV_outlier==0)
       
       if(any_convincing) {
-        print(paste(germline_filtered[outlier_pvals<0.05/length(germline_filtered) & NV_outlier==0],"is convincingly absent in this group"))
-        return(germline_filtered[outlier_pvals<0.05/length(germline_filtered) & NV_outlier==0])
+        print(paste(germline_filtered[outlier_pval.adj<0.05 & NV_outlier==0],"is convincingly absent in this group"))
+        return(germline_filtered[outlier_pval.adj<0.05 & NV_outlier==0])
       } else {
         print("There are no mutations called as germline that are robustly absent in this outlier group, though this would relies on adequate coverage")
         return(NULL)

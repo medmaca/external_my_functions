@@ -1,5 +1,13 @@
 ##SET OF FUNCTIONS DESIGNED FOR THE "Lesion_segregation_mutation_summaries.R" SCRIPT AND THE ANALYSIS
 
+#Write a vcf file for reading into MutationalPatterns
+write.vcf=function(details,vcf_path,select_vector=NULL,vcf_header_path="~/Documents/vcfHeader.txt") {
+  vcf=create_vcf_files(mat=details,select_vector=select_vector)
+  write.table(vcf,sep = "\t", quote = FALSE,file=paste0(vcf_path,".temp"),row.names = F)
+  system(paste0("cat ",vcf_header_path," ",vcf_path,".temp > ",vcf_path))
+  system(paste0("rm ",vcf_path,".temp"))
+}
+
 #This function is required in the filtering function
 get_ancestor_node=function(node,tree,degree=1){ #to get the 1st degree ancestor (i.e. the direct parent) use degree=1.  Use higher degrees to go back several generations.
   curr<-node
