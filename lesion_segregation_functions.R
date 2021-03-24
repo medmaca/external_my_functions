@@ -1174,3 +1174,59 @@ get_mean_ASCAT_minor_allele_cn=function(Chrom,Pos,samples,project) {
   #print(cn_vec)
   return(mean(cn_vec,na.rm = T))
 }
+
+##FUNCTIONS FOR THE ANALYSIS OF LESION SEGREAGATION DATA
+#estimate the parameters pf
+estimate_gamma_params=function(value_vec,log_rate_range=c(-2,1),shape_range=c(1,3)) {
+  # Function to estimate maximum likelihood value of rho for beta-binomial
+  rate_vec = 10^(seq(log_rate_range[1],log_rate_range[2],by=0.1)) # rho will be bounded within 1e-6 and 0.89
+  shape_vec=seq(shape_range[1],shape_range[2],0.05)
+  params_grid=expand_grid(rate_vec,shape_vec)
+  ll = sapply(1:nrow(params_grid), function(i) {shape=params_grid$shape_vec[i]; rate=params_grid$rate_vec[i];sum(dgamma(x=value_vec, shape=shape,rate=rate,log = T))})
+  return(params_grid[which.max(ll),])
+}
+
+#Updated version of the squash_tree function that allows you to squash from the root, as well as from the tips
+squash_tree=function(tree,cut_off=50,from_root=F) {
+  if(from_root){
+    idxs_to_squash=which(nodeHeights(tree)[,1]<=cut_off & nodeHeights(tree)[,2]>cut_off) #Find the edges that start below the cut-off but end-up above it
+    new_edge_lengths=nodeHeights(tree)[idxs_to_squash,2]-cut_off #work-out the edge lengths that these should be such that they finish at the cut-off
+    tree$edge.length[idxs_to_squash] <- new_edge_lengths #Assign these edge.lengths to the edges
+    
+    tree$edge.length[nodeHeights(tree)[,2]<=cut_off] <-0 #Any edge that starts at or above the cut-off -> 0
+    return(tree)
+  } else {
+    tree$edge.length[nodeHeights(tree)[,1]>=cut_off] <-0 #Any edge that starts at or above the cut-off -> 0
+    idxs_to_squash=which(nodeHeights(tree)[,1]<=cut_off & nodeHeights(tree)[,2]>cut_off) #Find the edges that start below the cut-off but end-up above it
+    new_edge_lengths=cut_off - nodeHeights(tree)[idxs_to_squash,1] #work-out the edge lengths that these should be such that they finish at the cut-off
+    tree$edge.length[idxs_to_squash] <- new_edge_lengths #Assign these edge.lengths to the edges
+    return(tree)
+  }
+}
+
+#First version of the sharedness stat - as per NW. However, this will give higher values of sharedness with smaller trees
+calculate_sharedness_stat=function(tree) {
+  prop_samples<-sapply(tree$edge[,2],function(node) {
+    prop_samples<-length(getTips(tree,node))/length(tree$tip.label)
+    return(prop_samples)
+  })
+  mean_w<-weighted.mean(x=prop_samples,w=tree$edge.length)
+  return(mean_w)
+}
+
+#Second version of the sharedness stat. Minus 1 from the numerator & denominator.
+calculate_sharedness_stat_2=function(tree) {
+  prop_samples<-sapply(tree$edge[,2],function(node) {
+    prop_samples<-(length(getTips(tree,node))-1)/(length(tree$tip.label)-1)
+    return(prop_samples)
+  })
+  mean_w<-weighted.mean(x=prop_samples,w=tree$edge.length)
+  return(mean_w)
+}
+
+#Count the number of internal nodes above a certain height i.e. for calculating the "post-developmental nodes"
+count_internal_nodes=function(tree,cut_off=50){
+  nodeheights=nodeHeights(tree)
+  internal_nodes_above_cutoff=sum(nodeheights[,2]>cut_off & !tree$edge[,2]%in%1:length(tree$tip.label))
+  return(internal_nodes_above_cutoff)
+}
