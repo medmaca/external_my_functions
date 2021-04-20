@@ -684,7 +684,7 @@ create_mut_df=function(mut,tree,matrices) {
   all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
   
   mut_df<-dplyr::bind_rows(mapply(function(samples,clade) {return(data.frame(NV=sum(matrices$NV[mut,samples]),NR=sum(matrices$NR[mut,samples]),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
-  mut_df$pos_test<-apply(mut_df,1,function(x){(x[2]>=8 & (x[1]/x[2])>=0.3)|(x[2]>=6 & (x[1]/x[2])>=0.5)})
+  mut_df$pos_test<-apply(mut_df,1,function(x){(x[2]>=12 & (x[1]/x[2])>=0.25)|(x[2]>=8 & (x[1]/x[2])>=0.3)|(x[2]>=6 & (x[1]/x[2])>=0.5)})
   mut_df$neg_test<-apply(mut_df,1,function(x){x[1]==0 & (x[2])>=10})
   return(mut_df)
 }
@@ -1177,7 +1177,7 @@ get_mean_ASCAT_minor_allele_cn=function(Chrom,Pos,samples,project) {
 
 ##FUNCTIONS FOR THE ANALYSIS OF LESION SEGREAGATION DATA
 #estimate the parameters pf
-estimate_gamma_params=function(value_vec,log_rate_range=c(-2,1),shape_range=c(1,3)) {
+estimate_gamma_params=function(value_vec,log_rate_range=c(-2,1),shape_range=c(1,5)) {
   # Function to estimate maximum likelihood value of rho for beta-binomial
   rate_vec = 10^(seq(log_rate_range[1],log_rate_range[2],by=0.1)) # rho will be bounded within 1e-6 and 0.89
   shape_vec=seq(shape_range[1],shape_range[2],0.05)

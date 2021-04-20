@@ -567,14 +567,24 @@ plot_d_or_r_tip_point = function(sample,tree,details,donor_ID,recip_ID,cols=c("d
   points(x=info$x,y=info$yb,type="p",pch=20,bg=tip_col,col=tip_col)
 }
 
-plot_category_tip_point = function(sample,tree,details=NULL,cat_df,cols=RColorBrewer::brewer.pal(8,"Set1")) {
-  cols=cols[1:length(unique(cat_df$cat))]
-  names(cols)<-unique(cat_df$cat)
+plot_category_tip_point = function(sample_ID,tree,details=NULL,cat_df,cat_name="cat",cols=RColorBrewer::brewer.pal(8,"Set1")) {
+  cols=cols[1:length(cat_df%>%pull(cat_name)%>%unique())]
+  names(cols)<-cat_df%>%pull(cat_name)%>%unique()
   
-  node=which(tree$tip.label==sample)
+  node=which(tree$tip.label==sample_ID)
   info=get_edge_info(tree,details,node)
-  tip_col=cols[cat_df$cat[cat_df$sample==sample]]
+  tip_col=cols[cat_df%>%filter(sample==sample_ID)%>%pull(cat_name)]
   points(x=info$x,y=info$yb,type="p",pch=20,bg=tip_col,col=tip_col)
+}
+
+plot_postGT_tree=function(tree,details,matrices,node,sharing_cols=c("gray92","black"),cat_df,...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
+  info=get_edge_info(tree,details,node=node)
+  n_pre=sum(cat_df%>%filter(sample%in%info$samples)%>%pull(timing)=="pre-GT")
+  sharing_info=ifelse(n_pre>0,"pre","post")
+  names(sharing_cols)=c("pre","post")
+  if(length(tree$edge.length[tree$edge[,2]==node])>0){
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=sharing_cols[sharing_info],lend=1,...)
+  }
 }
 
 plot_sharing_info=function(tree,details,matrices,node,sharing_cols=c("black","dark green","red"),...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
