@@ -684,7 +684,7 @@ create_mut_df=function(mut,tree,matrices) {
   all_clade_samples=lapply(all_clades,function(node) getTips(node=node,tree=tree))
   
   mut_df<-dplyr::bind_rows(mapply(function(samples,clade) {return(data.frame(NV=sum(matrices$NV[mut,samples]),NR=sum(matrices$NR[mut,samples]),clades=clade))},samples=all_clade_samples,clade=all_clades,SIMPLIFY = FALSE))
-  mut_df$pos_test<-apply(mut_df,1,function(x){(x[2]>=12 & (x[1]/x[2])>=0.25)|(x[2]>=8 & (x[1]/x[2])>=0.3)|(x[2]>=6 & (x[1]/x[2])>=0.5)})
+  mut_df$pos_test<-apply(mut_df,1,function(x){(x[2]>=12 & (x[1]/x[2])>=0.25)|(x[2]>=8 & (x[1]/x[2])>=0.3)|(x[2]>=6 & (x[1]/x[2])>=0.4)})
   mut_df$neg_test<-apply(mut_df,1,function(x){x[1]==0 & (x[2])>=10})
   return(mut_df)
 }
