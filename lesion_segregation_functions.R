@@ -2,7 +2,13 @@
 
 #Write a vcf file for reading into MutationalPatterns
 write.vcf=function(details,vcf_path,select_vector=NULL,vcf_header_path="~/Documents/vcfHeader.txt") {
-  vcf=create_vcf_files(mat=details,select_vector=select_vector)
+  if(class(details)=="character") {
+    mat=as.data.frame(stringr::str_split(details,pattern="-",simplify = T),stringsAsFactors=F)
+    colnames(mat)<-c("Chrom","Pos","Ref","Alt")
+    vcf=create_vcf_files(mat=mat,select_vector=select_vector)
+  } else {
+    vcf=create_vcf_files(mat=details,select_vector=select_vector)
+  }
   write.table(vcf,sep = "\t", quote = FALSE,file=paste0(vcf_path,".temp"),row.names = F)
   system(paste0("cat ",vcf_header_path," ",vcf_path,".temp > ",vcf_path))
   system(paste0("rm ",vcf_path,".temp"))
