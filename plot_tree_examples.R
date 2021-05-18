@@ -574,7 +574,7 @@ plot_category_tip_point = function(sample_ID,tree,details=NULL,cat_df,cat_name="
   node=which(tree$tip.label==sample_ID)
   info=get_edge_info(tree,details,node)
   tip_col=cols[cat_df%>%filter(sample==sample_ID)%>%pull(cat_name)]
-  points(x=info$x,y=info$yb,type="p",pch=20,bg=tip_col,col=tip_col)
+  points(x=info$x,y=info$yb,type="p",pch=21,bg=tip_col,col="black")
 }
 
 plot_postGT_tree=function(tree,details,matrices,node,sharing_cols=c("gray92","black"),cat_df,...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.

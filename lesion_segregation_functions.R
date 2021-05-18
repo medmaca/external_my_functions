@@ -237,45 +237,55 @@ reclassify_MNVs=function(COMB_mats,region_size=2,genomeFile) {
 
 #Function to find potential multi-allelic variants that may be caused by persistent DNA lesions
 #Assesses for overlapping positions of reference
-get_multi_allelic_variant_list=function(details) {
+get_multi_allelic_variant_list=function(details,SNV_only=F) {
   Chroms=c(1:22,"X","Y")
   details$Ref=as.character(details$Ref)
   details$Alt=as.character(details$Alt)
-  out_list_by_chrom=lapply(Chroms,function(Chrom) {
-    if(sum(details$Chrom==Chrom)>1) {
-      print(paste("Analysing chromosome",Chrom))
-      #Split comparison of mutations by chromosome
-      details_by_chrom=details[details$Chrom==as.character(Chrom),]
-      details_by_chrom=details_by_chrom[order(details_by_chrom$Pos),]
-      dups_list=lapply(1:(nrow(details_by_chrom)-1),function(i) {
-        if(i%%1000==0) {print(i)}
-        if(nchar(details_by_chrom$Ref[i])==1) {
-          Pos=as.numeric(details_by_chrom$Pos[i])
-        } else {
-          Pos=as.numeric(details_by_chrom$Pos[i]):(as.numeric(details_by_chrom$Pos[i])+nchar(details_by_chrom$Ref[i])-1)
-        }
-        out=sapply((i+1):min(i+5,nrow(details_by_chrom)),function(j) {
-          if(nchar(details_by_chrom$Ref[j])==1) {
-            pos=as.numeric(details_by_chrom$Pos[j])
-          } else {
-            pos=as.numeric(details_by_chrom$Pos[j]):(as.numeric(details_by_chrom$Pos[j])+nchar(details_by_chrom$Ref[j])-1)
-          }
-          if(length(intersect(pos,Pos))>0) {
-            return(T)
-          } else {
-            return(F)
-          }
-        })
-        if(any(out)) {return(c(details_by_chrom$mut_ref[i],details_by_chrom$mut_ref[(i+1):min(i+5,nrow(details_by_chrom))][out]))} else {return(NA)}
-      })
-      dups_list[sapply(dups_list,function(x) is.na(x[1]))]<-NULL
-      return(dups_list)
-    } else {
-      return(NULL)
+  if(SNV_only){
+    if(!"Chrom_pos"%in%colnames(details)){
+      details$Chrom_pos<-paste(details$Chrom,details$Pos,sep = "-")
     }
-    
-  })
-  out_list=unlist(out_list_by_chrom,recursive=F)
+    duplicates=details$Chrom_pos[duplicated(details$Chrom_pos)]
+    dups_list<-lapply(duplicates,function(Chrom_pos) {return(details$mut_ref[details$Chrom_pos==Chrom_pos])})
+    return(dups_list)
+  } else {
+    out_list_by_chrom=lapply(Chroms,function(Chrom) {
+      if(sum(details$Chrom==Chrom)>1) {
+        print(paste("Analysing chromosome",Chrom))
+        #Split comparison of mutations by chromosome
+        details_by_chrom=details[details$Chrom==as.character(Chrom),]
+        details_by_chrom=details_by_chrom[order(details_by_chrom$Pos),]
+        dups_list=lapply(1:(nrow(details_by_chrom)-1),function(i) {
+          if(i%%1000==0) {print(i)}
+          if(nchar(details_by_chrom$Ref[i])==1) {
+            Pos=as.numeric(details_by_chrom$Pos[i])
+          } else {
+            Pos=as.numeric(details_by_chrom$Pos[i]):(as.numeric(details_by_chrom$Pos[i])+nchar(details_by_chrom$Ref[i])-1)
+          }
+          out=sapply((i+1):min(i+5,nrow(details_by_chrom)),function(j) {
+            if(nchar(details_by_chrom$Ref[j])==1) {
+              pos=as.numeric(details_by_chrom$Pos[j])
+            } else {
+              pos=as.numeric(details_by_chrom$Pos[j]):(as.numeric(details_by_chrom$Pos[j])+nchar(details_by_chrom$Ref[j])-1)
+            }
+            if(length(intersect(pos,Pos))>0) {
+              return(T)
+            } else {
+              return(F)
+            }
+          })
+          if(any(out)) {return(c(details_by_chrom$mut_ref[i],details_by_chrom$mut_ref[(i+1):min(i+5,nrow(details_by_chrom))][out]))} else {return(NA)}
+        })
+        dups_list[sapply(dups_list,function(x) is.na(x[1]))]<-NULL
+        return(dups_list)
+      } else {
+        return(NULL)
+      }
+      
+    })
+    out_list=unlist(out_list_by_chrom,recursive=F)
+    return(out_list)
+  }
 }
 
 #Find the latest possible timing of the acquisition of the lesion
