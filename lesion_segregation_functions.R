@@ -670,6 +670,63 @@ check_matching_phasing=function(phasing_info1,phasing_info2,het_positions=NULL) 
   return(result)
 }
 
+
+check_matching_phasing_non_clonal=function(phasing_info1,phasing_info2,het_positions=NULL) {
+  if(any(sapply(list(phasing_info1,phasing_info2),is.logical))) {
+    result<-"Unable to confirm phasing"
+  } else {
+    if(is.null(het_positions)){stop(return("Must supply list of confirmed heterozygous SNP positions"))}
+    comb_df=inner_join(phasing_info1,phasing_info2,by="SNP_site")
+    comb_df$depth=comb_df$n_alt_reads_supporting.x+comb_df$n_alt_reads_supporting.y+comb_df$n_ref_reads_supporting.x+comb_df$n_ref_reads_supporting.y
+    snp_positions=as.numeric(str_split(pattern=":",comb_df$SNP_site,simplify=T)[,2])
+    comb_df<-comb_df[snp_positions%in%het_positions,]
+    if(nrow(comb_df)==0) {
+      stop(return("No SNPs appear to be heterozygous"))
+    }
+    
+    #Test for either alt matching alt, or ref matching ref for any individual SNP
+    matching_res=list(Matching_alt_phasing=comb_df$alt_phases_with_base.x==comb_df$alt_phases_with_base.y)
+    
+    matching_res=lapply(matching_res, function(vec) {
+      names(vec)<-1:length(vec)
+      vec_no_NAs<-vec[!is.na(vec)]
+      if(length(unique(vec_no_NAs))>1) { #If there is disagreement between different SNPs, retain the highest depth ones only
+        vec_no_NAs<-vec_no_NAs[as.character(which(comb_df$depth>median(comb_df$depth)))]
+      }
+      return(vec_no_NAs)
+    })
+    
+    if(all(sapply(matching_res,function(x) length(x)==0))){
+      result<-"Unable to confirm phasing"
+    } else if(all(unlist(matching_res))) {
+      result<-"Same phasing confirmed"
+    } else {
+      result<-"Non-matching phasing confirmed"
+    }
+  }
+  return(result)
+}
+
+assess_phasing_non_clonal=function(phasing_summaries,sample_sets,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,use_tree=T){
+  phase_sum1=phasing_summaries[[1]]
+  phase_sum2=phasing_summaries[[2]]
+  if(is.logical(phase_sum1)|is.logical(phase_sum2)) {
+    stop(return("Unable to phase"))
+  } else {
+    clade_base_counts_list=lapply(sample_sets,function(samples) {base_counts_list=get_base_counts_list(samples=samples,Chrom=Chrom,Pos=Pos,project=project,tree=tree,output_dir = output_dir,ref_sample_set = ref_sample_set,distance=distance,use_tree=use_tree);return(base_counts_list)})
+    aggregated_clade_base_counts_list=lapply(clade_base_counts_list,function(list) {
+      chrom_pos_df=list[[1]][,c(2,3)] #Get the co-ordinates of apparent het SNPs from the 1st in the list
+      list_mod=lapply(list,function(df) {res<-left_join(chrom_pos_df,df[,-1],by=c("Chr","Pos"));res[is.na(res)]<-0;return(res[,3:7])}) #Now get just the base counts at these sites
+      counts_df=Reduce(function(df1,df2) {return(df1+df2)},list_mod) #Aggregate these across a pure subclade
+      return(cbind(chrom_pos_df,counts_df))
+    })
+    het_positions<-return_heterozygous_SNPs(base_counts_list=aggregated_clade_base_counts_list)
+    het_positions<-het_positions[het_positions!=Pos] #Exclude the position of the actual mutation
+    outcome=check_matching_phasing_non_clonal(phase_sum1,phase_sum2,het_positions = het_positions)
+    return(outcome)
+  }
+}
+
 get_confirmed_heterozygous_SNPs=function(phasing_info1,phasing_info2){
   comb_df=full_join(phasing_info1,phasing_info2,by="SNP_site")
   comb_df$depth=comb_df$n_alt_reads_supporting.x+comb_df$n_alt_reads_supporting.y+comb_df$n_ref_reads_supporting.x+comb_df$n_ref_reads_supporting.y
