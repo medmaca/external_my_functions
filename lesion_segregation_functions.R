@@ -422,7 +422,7 @@ extract_phasing_info=function(list,Ref,Alt) {
 #Function will look in the supplied output_dir to see if phasing output for given sample/Chrom/Pos already exists, if not will run the .jl script. Imports the data.
 #Run example: get_phasing_list(samples=positive_samples1,Chrom=Chrom,Pos=Pos,project=project,output_dir = phasing_output_dir,ref_sample_set = Ref_sample_set)
 
-get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,force_rerun=F,verbose=F) {
+get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,force_rerun=F,verbose=F,use_tree=T) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
   if(is.numeric(project)) {
@@ -467,7 +467,14 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample))}
       sample_project=project$project[project$sample==sample]
-      set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",")
+      if(use_tree){
+        set.seed(1)
+        ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",")
+      } else {
+        sample_stem=stringr::str_split(sample,pattern = "_",simplify=T)[,1]
+        set.seed(1)
+        ref_sample_set=paste0(sample(x=project$sample[project$project==sample_project & grepl(sample_stem,project$sample)],size=5),collapse=",")
+      }
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
       
       if(!file.exists(phasing_output_file)|file.info(phasing_output_file)$size==0|force_rerun) {
@@ -489,7 +496,7 @@ get_phasing_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sam
 }
 
 
-get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,force_rerun=F,verbose=F) {
+get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref_sample_set,distance=1000,force_rerun=F,verbose=F,use_tree=T) {
   wd<-getwd()
   setwd("/lustre/scratch119/realdata/mdt1/team154/ms56/my_programs/Mike_phasing") #Need to be in this directory for the function
   if(is.numeric(project)) {
@@ -532,7 +539,14 @@ get_base_counts_list=function(samples,Chrom,Pos,project,tree=NULL,output_dir,ref
       basects_output_file=paste0(output_dir,"/",sample,"_",Chrom,"_",Pos,"_basects.txt")
       if(verbose) {print(paste("Looking in sample",sample))}
       sample_project=project$project[project$sample==sample]
-      set.seed(1); ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",") #Define a random set of samples (in the same project) from the tree used for finding heterozgous SNPs in the .jl phasing script
+      if(use_tree){
+        set.seed(1)
+        ref_sample_set=paste0(sample(x=tree$tip.label[tree$tip.label%in%project$sample[project$project==sample_project]],size=5),collapse=",")
+      } else {
+        sample_stem=stringr::str_split(sample,pattern = "_",simplify=T)[,1]
+        set.seed(1)
+        ref_sample_set=paste0(sample(x=project$sample[project$project==sample_project & grepl(sample_stem,project$sample)],size=5),collapse=",")
+      }
       if(verbose) {print(paste("Ref sample set chosen as",ref_sample_set))}
       if(!file.exists(basects_output_file)|file.info(basects_output_file)$size==0|force_rerun) {
         command=paste("julia DRIVER_phasing.jl",Chrom,Pos,sample,sample_project,as.character(distance),phasing_output_file,basects_output_file,ref_sample_set)
