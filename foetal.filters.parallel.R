@@ -586,11 +586,17 @@ split_vagrent_output = function(df,split_col,col_IDs = c("Gene","Transcript","RN
 
 #Function to check for mutations that have been called as germline that are in fact absent in a clade
 #Run using: res=check_for_false_germline_calls(tree,COMB_mats = COMB_mats, filter_params=filter_params)
+is.snv=function(mut_ref) {
+  sub=stringr::str_split(mut_ref,pattern = "-",simplify=T)[3:4]
+  res=ifelse(nchar(sub[1])==1 & nchar(sub[2])==1,T,F)
+  return(res)
+}
 
 check_for_false_germline_calls = function(tree,
                                           COMB_mats,
                                           filter_params,
-                                          max_clade_prop=0.1 #the cutoff size (proportion of total samples included in clade) to test the clade for absent germline mutations. At >10% the germline filter is unlikely to wrongly remove mutations.
+                                          max_clade_prop=0.1, #the cutoff size (proportion of total samples included in clade) to test the clade for absent germline mutations. At >10% the germline filter is unlikely to wrongly remove mutations.
+                                          SNVs_only=T #Only re-add SNVs (indels are likely to be high frequency artefacts)
 ) {
   #Pull out the root clades
   get_root_clades=function(tree) {
@@ -628,11 +634,13 @@ check_for_false_germline_calls = function(tree,
       #hist(log10(outlier_pvals),breaks=50,main="Unadjusted p-values for mutations being present in outlier group") #Review the p-value histogram - any clear low outliers?
       
       #Test for germline filtered mutations that are likely to be absent (with Bon-Ferroni correction for multiple testing)
-      any_convincing=sum(outlier_pval.adj<0.05 & NV_outlier==0)
-      
-      if(any_convincing) {
-        print(paste(germline_filtered[outlier_pval.adj<0.05 & NV_outlier==0],"is convincingly absent in this group"))
-        return(germline_filtered[outlier_pval.adj<0.05 & NV_outlier==0])
+      mut_refs<-germline_filtered[outlier_pval.adj<0.05 & NV_outlier==0]
+      if(SNVs_only & length(mut_refs)>0) {
+        mut_refs<-mut_refs[sapply(mut_refs,is.snv)]
+      }
+      if(length(mut_refs)>0) {
+        print(paste(mut_refs,"is convincingly absent in this group"))
+        return(mut_refs)
       } else {
         print("There are no mutations called as germline that are robustly absent in this outlier group, though this would relies on adequate coverage")
         return(NULL)
