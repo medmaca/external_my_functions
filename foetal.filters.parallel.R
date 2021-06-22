@@ -680,7 +680,7 @@ assign_mutations_to_branches=function(tree,filtered_muts,keep_ancestral=T,create
     #Get matrices in order, and run the main assignment functions
     mtr = filtered_muts$COMB_mats.tree.build$NV; mtr = as.matrix(mtr)
     depth = filtered_muts$COMB_mats.tree.build$NR; depth = as.matrix(depth)
-    p.error = rep(p.error.value, ncol(filtered_muts$COMB_mats.tree.build$NR))
+    p.error = sapply(df$samples,function(x) ifelse(x=="Ancestral",1e-6,p.error.value))
     res = assign_to_tree(mtr[,df$samples], depth[,df$samples], df, error_rate = p.error) #Get res (results!) object
     
   } else {
@@ -695,7 +695,7 @@ assign_mutations_to_branches=function(tree,filtered_muts,keep_ancestral=T,create
     #Get matrices in order, and run the main assignment functions
     mtr = filtered_muts$COMB_mats.tree.build$NV; mtr$Ancestral=0; mtr = as.matrix(mtr)
     depth = filtered_muts$COMB_mats.tree.build$NR; depth$Ancestral=10; depth = as.matrix(depth)
-    p.error = c(rep(p.error.value, ncol(filtered_muts$COMB_mats.tree.build$NR)),1e-6)
+    p.error = sapply(df$samples,function(x) ifelse(x=="Ancestral",1e-6,p.error.value))
     res = assign_to_tree(mtr[,df$samples], depth[,df$samples], df, error_rate = p.error) #Get res (results!) object
   }
   
@@ -705,9 +705,9 @@ assign_mutations_to_branches=function(tree,filtered_muts,keep_ancestral=T,create
     #Maintain the dichotomy with the ancestral branch
     if(keep_ancestral) {
       ROOT=tree$edge[1,1]
-      current_length<-tree$edge.length[tree$edge[,1]==ROOT & tree$edge[,2]!=1]
+      current_length<-tree$edge.length[tree$edge[,1]==ROOT & tree$edge[,2]!=which(tree$tip.label=="Ancestral")]
       new_length<-ifelse(current_length==0,1,current_length)
-      tree$edge.length[tree$edge[,1]==ROOT & tree$edge[,2]!=1]<-new_length
+      tree$edge.length[tree$edge[,1]==ROOT & tree$edge[,2]!=which(tree$tip.label=="Ancestral")]<-new_length
     }
     tree<-di2multi(tree) #Now make tree multifurcating
     df = reconstruct_genotype_summary(tree) #Define df (data frame) for new treeshape
@@ -716,8 +716,8 @@ assign_mutations_to_branches=function(tree,filtered_muts,keep_ancestral=T,create
     res = assign_to_tree(mtr[,df$samples], depth[,df$samples], df, error_rate = p.error) #Get res (results!) object
   }
   
-  #Add the tree to the res object
-  res$tree<-tree
+  tree$edge.length <- res$df$df$edge_length #Assign edge lengths from the most recent res object
+  res$tree<-tree #Add the tree to the res object
   
   #See how many mutations are "poor fit"
   poor_fit = res$summary$pval < treefit_pval_cutoff  #See how many mutations don't have read counts that fit the tree very well
