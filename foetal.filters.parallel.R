@@ -653,22 +653,42 @@ check_for_false_germline_calls = function(tree,
   }
 }
 
+# #This is Nick's version of the function: adds the ancestral tip at the beginning (i.e. as position 1)
+# add_ancestral_outgroup=function(tree,outgroup_name="Ancestral"){
+#   tmp=tree$edge
+#   N=length(tree$tip.label)
+#   ##Renumber what was root->max+1
+#   ##Renumber the node with the sameid as new root as max+2
+#   renamedroot=max(tmp+1)
+#   tmp=ifelse(tmp==N+1,renamedroot,tmp)
+#   ##tmp[which(tmp[,1]==(N+1)),1]=renamedroot
+#   tmp=ifelse(tmp==N+2,renamedroot+1,tmp)
+#   ##Increment tips by 1
+#   tmp[,2]=ifelse(tmp[,2]<=N,tmp[,2]+1,tmp[,2])
+#   
+#   tree$edge=rbind(matrix(c(N+2,N+2,renamedroot,1),ncol=2,byrow  = FALSE),tmp)
+#   tree$edge.length=c(0,0,tree$edge.length)
+#   
+#   tree$tip.label=c(outgroup_name,tree$tip.label)
+#   tree$Nnode=tree$Nnode+1
+#   mode(tree$Nnode)="integer"
+#   mode(tree$edge)="integer"
+#   tree
+# }
+
+#This version of the function adds the ancestral tip at the end
 add_ancestral_outgroup=function(tree,outgroup_name="Ancestral"){
   tmp=tree$edge
   N=length(tree$tip.label)
-  ##Renumber what was root->max+1
-  ##Renumber the node with the sameid as new root as max+2
-  renamedroot=max(tmp+1)
-  tmp=ifelse(tmp==N+1,renamedroot,tmp)
-  ##tmp[which(tmp[,1]==(N+1)),1]=renamedroot
-  tmp=ifelse(tmp==N+2,renamedroot+1,tmp)
-  ##Increment tips by 1
-  tmp[,2]=ifelse(tmp[,2]<=N,tmp[,2]+1,tmp[,2])
+  newroot=N+2
+  renamedroot=N+3
+  ancestral_tip=N+1
+  tmp=ifelse(tmp>N,tmp+2,tmp)
   
-  tree$edge=rbind(matrix(c(N+2,N+2,renamedroot,1),ncol=2,byrow  = FALSE),tmp)
-  tree$edge.length=c(0,0,tree$edge.length)
+  tree$edge=rbind(c(newroot,renamedroot),tmp,c(newroot,ancestral_tip))
+  tree$edge.length=c(0,tree$edge.length,0)
   
-  tree$tip.label=c(outgroup_name,tree$tip.label)
+  tree$tip.label=c(tree$tip.label,outgroup_name)
   tree$Nnode=tree$Nnode+1
   mode(tree$Nnode)="integer"
   mode(tree$edge)="integer"
