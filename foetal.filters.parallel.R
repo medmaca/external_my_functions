@@ -508,17 +508,17 @@ get_early_nodes = function(tree,divisions=2) {
 }
 
 #Function to calculate peak VAFs from sample mutations (after applying germline and beta-binomial filters) to screen for mixed colonies
-check_peak_vaf = function(sample, COMB_mats, filter_params) {
+check_peak_vaf = function(sample, COMB_mats, filter_params,rho_cutoff=0.3) {
   colnames(COMB_mats$NV) <- gsub(pattern = "_MTR", replacement = "",x = colnames(COMB_mats$NV))
-  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > 0.3 ,sample])
+  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > rho_cutoff ,sample])
   return(dens$x[which.max(dens$y)])
 }
 
 #Function to visualize VAF plots in similar way to the above
-vaf_density_plot = function(sample, COMB_mats, filter_params) {
+vaf_density_plot = function(sample, COMB_mats, filter_params,rho_cutoff=0.3) {
   colnames(COMB_mats$NV)=colnames(COMB_mats$NR)=gsub(pattern = "_MTR", replacement = "",x = colnames(COMB_mats$NV))
   sample_mean_depth = mean(COMB_mats$NR[,sample])
-  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > 0.1 ,sample])
+  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > rho_cutoff ,sample])
   plot(dens, main = sample,xlim=c(-0.05,1.05))
   abline(v = dens$x[which.max(dens$y)])
   text(0.7, max(dens$y) - 0.2, paste("Peak VAF dens=",round(dens$x[which.max(dens$y)], digits = 2),"\nMean coverage=",round(sample_mean_depth,digits =2)), col = "red", cex = 0.7)
