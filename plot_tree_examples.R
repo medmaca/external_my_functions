@@ -414,15 +414,18 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
   info=get_edge_info(tree,details,node)
   idx=info$idx[which(details[[query.field]][info$idx] %in% query.allowed.df$value)]
   if(length(idx)>1){
-    stop("Some branches have multiple variants")
+    print("Some branches have multiple variants, plotting only the first variant of each branch")
+    query.value=details[[query.field]][idx]
+    vlabels=paste0(details[[label.field]][idx],collapse="\n")
+  } else {
+    query.value=details[[query.field]][idx]
+    idx.match=match(query.value,query.allowed.df$value)
+    cols=query.allowed.df$col[idx.match]
+    vlabels=details[[label.field]][idx]
   }
-  query.value=details[[query.field]][idx]
-  idx.match=match(query.value,query.allowed.df$value)
-  cols=query.allowed.df$col[idx.match]
-  
-  vlabels=details[[label.field]][idx]
+
   ## spread out
-  N=length(idx)
+  N=ifelse(length(idx)>0,1,0)
   ##Vertical offset so that labels sit slightly above the markers.
   if(N>0){
     arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col="red",lend=1,lwd=3,lty=lty,...)
