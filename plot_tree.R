@@ -69,7 +69,117 @@ set_tree_coords=function(atree){
   }
   atree
 }
-plot_tree=function(tree,direction="down",cex.label=1,offset=0,b_do_not_plot=FALSE,lwd=1,bars=NULL,default_edge_color="darkgrey",ymax=NULL,cex.terminal.dots=0,plot_axis=TRUE){
+
+
+plot_tree=function(tree,direction="down",cex.label=5,offset=0,plot_axis=T,title=NULL,b_do_not_plot=FALSE,lwd=1,bars=NULL,default_edge_color="darkgrey",ymax=NULL,cex.terminal.dots=0,vspace.reserve=0){
+  par(mar=c(1, 1, 1, 3) + 0.1)
+  #browser()
+  if(!(direction %in% c("down","across"))){
+    stop("Unsupported direction provided")
+  }
+  N=length(tree$tip.label)
+  if(is.null(tree$coords)){
+    tree=set_tree_coords(tree)
+  }
+  coords=tree$coords
+  
+  if(direction=="across"){
+    xmax=max(coords$a1)*1.05
+    ymax=max(coords$b1)+1
+    offset=offset*xmax
+  }else{
+    if(is.null(ymax)){
+      ymax=max(coords$a1)*1.05
+    }
+    xmax=max(coords$b1)+1
+    offset=offset*ymax
+  }
+  if(b_do_not_plot){
+    return(tree)
+  }
+  if(is.null(bars)){
+    ymin=0-ymax*0.05-vspace.reserve*ymax
+    plot(NULL,axes=FALSE,xlim=c(0-(xmax*0.1),xmax),ylim=c(ymin,ymax),xlab="",ylab="")
+  }else{
+    plot(NULL,axes=FALSE,xlim=c(0-(xmax*0.1),xmax),ylim=c(0-(ymax*0.15),ymax),xlab="",ylab="")
+  }
+  idx.tip=match(1:N,tree$edge[,2])
+  if(direction=="across"){
+    apply(coords,1,function(x) elbow(x[1],x[2],x[3],x[4]))
+    text(tree$tip.label,x =coords$a1[idx.tip]+offset ,y=coords$b1[idx.tip],cex = cex.label,pos = 4)
+  }else{
+    top=max(coords$a1)
+    ##browser()
+    m=dim(coords)[1]
+    if(is.null(coords$color)){
+      col=rep(default_edge_color,m)
+    }else{
+      col=coords$color
+    }
+    sapply(1:m,function(i) {x=as.numeric(coords[i,1:4]);elbowv(x[3],x[4],top-x[1],top-x[2],col=col[i],lwd=lwd)})
+    if(is.null(tree$tip.color)){
+      tipcol="black"
+    }else{
+      tipcol=tree$tip.color
+    }
+    #if(cex.label>0){
+    #text(tree$tip.label,y =top-(coords$a1[idx.tip]+offset) ,x=coords$b1[idx.tip],cex = cex.label,pos = 1,col=tipcol)
+    # }
+    if(cex.terminal.dots>0){
+      points(y =top-(coords$a1[idx.tip]) ,x=coords$b1[idx.tip],col=c("darkgrey", "blueviolet","deeppink")[Y_loss], cex=cex.terminal.dots,pch=15)
+    }
+  }
+  tree$direction=direction
+  tree$top=top
+  #scale =10
+  scales=c(0,10,100,200,500,1000,2000,5000)
+  scale=scales[max(which(ymax/4>scales))]
+  #scale=scales[max(which(ymax/2>=scales))]
+  #browser()
+  cat("scale=",scale,"\n")
+  if(plot_axis){
+    axis(side = 4,at=seq(top,-scale,-scale),label=seq(0,top+scale,scale),las=2, cex.axis = 1, lwd = 1, lwd.ticks = 1, col = "black") 
+  }
+  if(!is.null(title)) {
+    text(x = 0,y=ymax,pos = 4,labels = title)
+  }
+  #arrows(x0=length(tree$tip.label)+0.5,y0=0,y1=scale,length=0.1,code=3,angle=90)
+  #text(sprintf("Mutation number",scale),x=length(tree$tip.label)-0.5,y=0.5*scale,pos=4,cex=cex.label,offset=0.1)
+  if(!is.null(bars)){
+    maxbar=max(bars)
+    idx=match(names(bars),tree$tip.label)
+    rect(xleft=idx-0.5,xright=idx+0.5,ybottom = -ymax*0.15,ytop=-ymax*0.15+ymax*0.1*bars/maxbar,border = "black",lwd=0.25,col="darkred")
+    
+  }
+  tree$ymax=ymax
+  tree$vspace.reserve=vspace.reserve
+  tree
+}
+
+## Add heatmap with additional information under tree
+add_heatmap=function(tree,heatmap,heatvals=NULL,border="white",cex.label=2){
+  ymax=tree$ymax
+  idx=match(colnames(heatmap),tree$tip.label)
+  top=-0.01*ymax
+  gap=tree$vspace.reserve/dim(heatmap)[1]
+  labels=rownames(heatmap)
+  for(i in 1:dim(heatmap)[1]){
+    bot=top-0.05*ymax
+    #bot=top-(0.05/dim(heatmap)[1])*ymax
+    rect(xleft=idx-0.5,xright=idx+0.5,ybottom = bot,ytop=top,col = heatmap[i,],border=border,lwd = 0.25)
+    if(!is.null(heatvals)){
+      text(xx=idx,y=0.5*(top+bot),labels = sprintf("%3.2f",heatvals[i,]))
+    }
+    if(!is.null(labels)){
+      text(labels[i],x=-0.5,y=0.5*(top+bot),pos = 2,cex = cex.label)
+    }
+    top=bot
+  }
+  tree
+}
+
+
+plot_tree_old=function(tree,direction="down",cex.label=1,offset=0,b_do_not_plot=FALSE,lwd=1,bars=NULL,default_edge_color="darkgrey",ymax=NULL,cex.terminal.dots=0,plot_axis=TRUE){
   par(mar=c(1, 1, 1, 3) + 0.1)
   #browser()
   if(!(direction %in% c("down","across"))){

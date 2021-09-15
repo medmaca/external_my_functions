@@ -11,7 +11,7 @@ get_edge_info=function(tree,details,node){
   list(yb=y[1],yt=y[2],x=x[1],xm=x[2],idx.in.details=idx,samples=samples)
 }
 
-add_annotation=function(tree,details,matrices,annot_function,...){
+add_annotation=function(tree,details=NULL,matrices=NULL,annot_function,...){
   N=dim(tree$edge)[1]
   lapply(1:N,function(i) annot_function(tree,details,matrices,tree$edge[i,2],...))
 }
@@ -409,6 +409,7 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
                            b.add.label=TRUE,
                            b.add.marker=TRUE,
                            lty=1,
+                           lwd=3,
                            ... ##<< paremeters for points (not color)
 ){
   info=get_edge_info(tree,details,node)
@@ -428,10 +429,10 @@ add_simple_labels_line=function(tree,##<< enhanced phylo returned from plot_tree
   N=ifelse(length(idx)>0,1,0)
   ##Vertical offset so that labels sit slightly above the markers.
   if(N>0){
-    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col="red",lend=1,lwd=3,lty=lty,...)
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col="red",lend=1,lwd=lwd,lty=lty,...)
     if(b.add.label){
       #text(rep(info$x,N),y=info$yb+0.5*(info$yt-info$yb),labels = vlabels,pos = 2,offset = 0.25,cex=cex.label)
-      boxtext(info$x-1,info$yb+0.5*(info$yt-info$yb),col.bg="white",border.bg="black",padding = c(0.5, 1),labels = vlabels,pos=2,cex=cex.label)
+      boxtext(info$x-1,info$yb+runif(1,min=0.35*(info$yt-info$yb),max=0.65*(info$yt-info$yb)),col.bg="white",border.bg="black",padding = c(0.5, 5),labels = vlabels,pos=2,cex=cex.label)
     }
   }
   list(node=node,value=query.value)
@@ -446,7 +447,8 @@ plot_tree_labels=function(tree,details,
                                                       ),
                           label.field="GENE",
                           cex.label=1,
-                          lty=1){
+                          lty=1,
+                          lwd=1){
   if(type=="label") {res=add_annotation(tree,
                      details,list(),
                      function(tree,details,matrices,node){
@@ -465,7 +467,8 @@ plot_tree_labels=function(tree,details,
                                                                   query.allowed.df = query.allowed.df,
                                                                   label.field = label.field,
                                                                   cex.label=cex.label,
-                                                                  lty=lty)})}
+                                                                  lty=lty,
+                                                                  lwd=lwd)})}
 }
 
 
@@ -537,17 +540,7 @@ add_var_col=function(tree, ##<< enhanced phylo returned from plot_tree
   }
 }
 
-plot_sharing_info=function(tree,details,matrices,node,sharing_cols=c("black","dark green","red"),...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
-  stopifnot(exists("donor_ID"),exists("recip_ID"))
-  info=get_edge_info(tree,details,node=node)
-  n_donor=sum(grepl(donor_ID,info$samples))
-  n_recip=sum(grepl(recip_ID,info$samples))
-  sharing_info=ifelse(n_donor>0&n_recip>0,"shared",ifelse(n_donor>0,"donor","recipient"))
-  names(sharing_cols)=c("shared","donor","recipient")
-  if(length(tree$edge.length[tree$edge[,2]==node])>0){
-    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=sharing_cols[sharing_info],lend=1,...)
-  }
-}
+
 
 highlight_nodes=function(tree,details,matrices,node,nodes,...) {
   info=get_edge_info(tree,details,node=node)
@@ -590,15 +583,14 @@ plot_postGT_tree=function(tree,details,matrices,node,sharing_cols=c("gray92","bl
   }
 }
 
-plot_sharing_info=function(tree,details,matrices,node,sharing_cols=c("black","dark green","red"),...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
-  stopifnot(exists("donor_ID"),exists("recip_ID"))
+plot_sharing_info=function(tree,details,matrices,node,donor_ID,recip_ID,sharing_cols=c("black","dark green","red"),...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
   info=get_edge_info(tree,details,node=node)
   n_donor=sum(grepl(donor_ID,info$samples))
   n_recip=sum(grepl(recip_ID,info$samples))
   sharing_info=ifelse(n_donor>0&n_recip>0,"shared",ifelse(n_donor>0,"donor","recipient"))
   names(sharing_cols)=c("shared","donor","recipient")
   if(length(tree$edge.length[tree$edge[,2]==node])>0){
-    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=sharing_cols[sharing_info],lend=1,...)
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=sharing_cols[sharing_info],lend=1,lwd=ifelse(sharing_info=="shared",1.5,1),...)
   }
 }
 
