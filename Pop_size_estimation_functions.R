@@ -6,7 +6,7 @@ library(phangorn)
 library(spam)
 #library(INLA)
 #library(phylodyn)
-library(ggtree)
+#library(ggtree)
 
 #Source PC's functions
 find.distance <- function(tree, from, to) {
