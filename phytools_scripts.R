@@ -163,3 +163,62 @@ get_minimum_clones=function(tree,donor_ID,recip_ID){
   return(total_clones)
 }
 
+#Setup functions for AMOVA
+# function to perform amova.
+amova.fn <- function(distmat, groupnames, cell_key) {
+  groupnums <- length(groupnames)
+  dw <- c()
+  cellnums <- c()
+  for (i in 1:groupnums) {
+    tgroup <- groupnames[i]
+    tcells <- which(rownames(distmat) %in% cell_key$Sample[cell_key$Cell_type==tgroup])
+    cellnums <- c(cellnums, length(tcells))
+    dw <- c(dw, sum(distmat[tcells, tcells]))
+  }
+  tdist <- distmat[colnames(distmat) %in% cell_key$Sample[cell_key$Cell_type %in% groupnames], rownames(distmat) %in% cell_key$Sample[cell_key$Cell_type %in% groupnames]]
+  dap <- (sum(tdist) - sum(dw))/2
+  
+  dfAP <- length(groupnames) - 1 
+  dfWP <- sum(cellnums-1)
+  N <- sum(cellnums)
+  SSwp <- sum(dw/(cellnums*2))
+  SSap <- sum(((dw + dap)/(2*N)) - (dw/(2*cellnums)))
+  
+  MSwp <- SSwp/dfWP
+  MSap <- SSap/dfAP
+  nc <- (N - (sum(cellnums^2)/N))/dfAP
+  varwp <- MSwp
+  varap <- (MSap - MSwp)/nc
+  obsphi <- varap/(varwp + varap)
+  return(obsphi)
+}
+
+# function to randomise sample labels and repeat
+randamova.fn <- function(distmat, groupnames, cell_key) {
+  
+  # change added 2018.01.22: when randomizing, only include the part of the distance matrix that involves the cell types being considered.
+  tcells <- which(rownames(distmat) %in% cell_key$Sample[cell_key$Cell_type %in% groupnames])
+  #
+  
+  randmat <- distmat[tcells, tcells]
+  colnames(randmat) <- sample(colnames(randmat))
+  rownames(randmat) <- colnames(randmat)
+  randphi <- amova.fn(distmat=randmat, groupnames=groupnames, cell_key=cell_key)
+  return(randphi)
+}
+
+# function tying it all in together
+amovapval.fn <- function(distmat, groupnames, cell_key, iterations, plottitle) {
+  # calculate observed
+  obsphi <- amova.fn(distmat=distmat, groupnames=groupnames, cell_key=cell_key)
+  # calculate null
+  randphis <- sapply(1:iterations, function(cell) randamova.fn(distmat = distmat, groupnames=groupnames, cell_key=cell_key))
+  # calculate pval
+  pval <- length(which(randphis>obsphi))/length(randphis) 
+  
+  hist(randphis, col="grey", 100, main=plottitle, xlab="Phi statistic")
+  abline(v=obsphi, col="red", lwd=2)
+  legend("topright", legend=paste0("Observed\n p = ", signif(pval,digits=2)), lwd=2, col="red", bty="n")
+}
+
+
