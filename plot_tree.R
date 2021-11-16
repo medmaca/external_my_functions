@@ -70,8 +70,7 @@ set_tree_coords=function(atree){
   atree
 }
 
-
-plot_tree=function(tree,direction="down",cex.label=5,offset=0,plot_axis=T,title=NULL,b_do_not_plot=FALSE,lwd=1,bars=NULL,default_edge_color="darkgrey",ymax=NULL,cex.terminal.dots=0,vspace.reserve=0){
+plot_tree=function(tree,direction="down",cex.label=5,offset=0,plot_axis=T,title=NULL,b_do_not_plot=FALSE,lwd=1,bars=NULL,default_edge_color="darkgrey",ymax=NULL,cex.terminal.dots=0,vspace.reserve=0,cex.axis=1){
   par(mar=c(1, 1, 1, 3) + 0.1)
   #browser()
   if(!(direction %in% c("down","across"))){
@@ -132,13 +131,13 @@ plot_tree=function(tree,direction="down",cex.label=5,offset=0,plot_axis=T,title=
   tree$direction=direction
   tree$top=top
   #scale =10
-  scales=c(0,10,100,200,500,1000,2000,5000)
+  scales=c(0,0.5,2,5,10,100,200,500,1000,2000,5000)
   scale=scales[max(which(ymax/4>scales))]
   #scale=scales[max(which(ymax/2>=scales))]
   #browser()
   cat("scale=",scale,"\n")
   if(plot_axis){
-    axis(side = 4,at=seq(top,-scale,-scale),label=seq(0,top+scale,scale),las=2, cex.axis = 1, lwd = 1, lwd.ticks = 1, col = "black") 
+    axis(side = 4,at=seq(top,-scale,-scale),label=seq(0,top+scale,scale),las=2, cex.axis = cex.axis, lwd = 1, lwd.ticks = 1, col = "black") 
   }
   if(!is.null(title)) {
     text(x = 0,y=ymax,pos = 4,labels = title)

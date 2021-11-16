@@ -563,24 +563,28 @@ plot_d_or_r_tip_point = function(sample,tree,details,donor_ID,recip_ID,cols=c("d
   points(x=info$x,y=info$yb,type="p",pch=20,bg=tip_col,col=tip_col)
 }
 
-plot_category_tip_point = function(sample_ID,tree,details=NULL,cat_df,cat_name="cat",cols=RColorBrewer::brewer.pal(8,"Set1")) {
+plot_category_tip_point = function(sample_ID,tree,details=NULL,cat_df,cat_name="cat",cols=RColorBrewer::brewer.pal(8,"Set1"),col="black",...) {
   cols=cols[1:length(cat_df%>%pull(cat_name)%>%unique())]
   names(cols)<-cat_df%>%pull(cat_name)%>%unique()
   
   node=which(tree$tip.label==sample_ID)
   info=get_edge_info(tree,details,node)
   tip_col=cols[cat_df%>%filter(sample==sample_ID)%>%pull(cat_name)]
-  points(x=info$x,y=info$yb,type="p",pch=21,bg=tip_col,col="black")
+  points(x=info$x,y=info$yb,type="p",pch=21,bg=tip_col,col=col,...)
 }
 
-plot_postGT_tree=function(tree,details,matrices,node,sharing_cols=c("gray92","black"),cat_df,...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
+plot_postGT_tree=function(tree,details,matrices,node,highlight="post",sharing_cols=c("black","gray92"),cat_df){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
   info=get_edge_info(tree,details,node=node)
-  n_pre=sum(cat_df%>%filter(sample%in%info$samples)%>%pull(timing)=="pre-GT")
-  sharing_info=ifelse(n_pre>0,"pre","post")
-  names(sharing_cols)=c("pre","post")
-  if(length(tree$edge.length[tree$edge[,2]==node])>0){
-    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=sharing_cols[sharing_info],lend=1,...)
+  if(highlight=="pre"){
+    n=sum(cat_df%>%dplyr::filter(Sample%in%info$samples)%>%pull(Time_point)==0)
+  } else if(highlight=="post"){
+    n=sum(cat_df%>%dplyr::filter(Sample%in%info$samples)%>%pull(Time_point)>0)
   }
+  sharing_info=ifelse(n>0,"highlight","lowlight")
+  names(sharing_cols)=c("highlight","lowlight")
+  #if(length(tree$edge.length[tree$edge[,2]==node])>0){
+    arrows(y0=info$yb,y1=info$yt,x0=info$x,x1=info$x,length=0,col=sharing_cols[sharing_info],lend=1)
+  #}
 }
 
 plot_sharing_info=function(tree,details,matrices,node,donor_ID,recip_ID,sharing_cols=c("black","dark green","red"),...){  #sharing_cols is a vector of colours for "shared", "donor only" and "recipient only" branches.
@@ -784,3 +788,40 @@ highlight_samples=function(tree,samples) {
   edge_cols=sapply(tree$edge[,2],function(node) ifelse(node%in%tips,"red","black"))
   return(edge_cols)
 }
+
+
+##FUNCTION FOR THE SIMULATED TREES
+drivers_per_sample=function(tree){
+  if(is.null(tree$events)){stop(print("Need tree with events matrix recording driver information."))}
+  driver_nodes=tree$events$node[tree$events$value==1 & tree$events$driverid>0]
+  n_drivers<-sapply(tree$tip.label[-1],function(tip) { #Don't include the 'ancestral tip'
+    tip_nodes<-get_ancestral_nodes(which(tree$tip.label==tip),edge = tree$edge)
+    return(sum(driver_nodes%in%tip_nodes))
+  })
+  driver_ids<-sapply(tree$tip.label[-1],function(tip) { #Don't include the 'ancestral tip'
+    tip_nodes<-get_ancestral_nodes(which(tree$tip.label==tip),edge = tree$edge)
+    driver_ids<-tree$events%>%dplyr::filter(driverid!=0 & node %in% tip_nodes)%>%pull(driverid)
+    return(paste0(driver_ids,collapse=","))
+  })
+  return(data.frame(Sample=tree$tip.label[-1],n_drivers=n_drivers,driver_ids=ifelse(nchar(driver_ids)==0,NA,driver_ids)))
+}
+
+##FUNCTION FOR THE DATA TREES
+drivers_per_sample_data=function(tree,details){
+  require(dplyr)
+  if(is.null(details$is.driver)){stop(print("Need variable 'is.driver' in the details matrix"))}
+  driver_nodes=details%>%dplyr::filter(is.driver==1)%>%pull(node)
+  n_drivers<-sapply(tree$tip.label,function(tip) {
+    tip_nodes<-get_ancestral_nodes(which(tree$tip.label==tip),edge = tree$edge)
+    return(sum(driver_nodes%in%tip_nodes))
+  })
+  driver_ids<-sapply(tree$tip.label,function(tip) {
+    tip_nodes<-get_ancestral_nodes(which(tree$tip.label==tip),edge = tree$edge)
+    driver_ids<-details%>%dplyr::filter(node %in% tip_nodes & is.driver==1)%>%pull(variant_ID)
+    return(paste0(driver_ids,collapse=","))
+  })
+  out_df<-data.frame(Sample=tree$tip.label,n_drivers=n_drivers,driver_ids=ifelse(nchar(driver_ids)==0,NA,driver_ids))
+  out_df<-out_df%>%dplyr::filter(Sample!="Ancestral")
+  return(out_df)
+}
+

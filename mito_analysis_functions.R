@@ -89,10 +89,10 @@ plot_multi_VAF=function(tree,
   #if(node==1) {text(1,1,pos=4,paste(mut1,": Maximum VAF is",round(max_vaf,digits = 3),"Minimum VAF is:",round(min_vaf,digits = 3)))}
 }
 
-reverse_germline=function(matrices) {
+reverse_germline=function(matrices,threshold=0.5) {
   mean_vaf=rowMeans(matrices$NV/matrices$NR)
-  matrices$NV[mean_vaf>0.5,]<-(matrices$NR[mean_vaf>0.5,]-matrices$NV[mean_vaf>0.5,])
-  matrices$SW[mean_vaf>0.5,]<-0 #Shearwater not set up to call somatic reversion mutations, therefore just set these to 0 across samples
+  matrices$NV[mean_vaf>threshold,]<-(matrices$NR[mean_vaf>threshold,]-matrices$NV[mean_vaf>threshold,])
+  matrices$SW[mean_vaf>threshold,]<-0 #Shearwater not set up to call somatic reversion mutations, therefore just set these to 0 across samples
   return(matrices)
 }
 
@@ -204,7 +204,7 @@ generate_mito_matrices=function(PD_number,tree_file_path,pileup_folder=NULL,shea
   #If 'reverse germline' option selected, reverse the mut/ wt calls for those mutations that are more common than the wild type
   #(i.e. likely to have been mutant in the oocyte)
   if(reverse_germline){
-    matrices=reverse_germline(matrices)
+    matrices=reverse_germline(matrices,threshold=0.9)
   }
   
   vaf=calculate_vaf(matrices$NV,matrices$NR)
