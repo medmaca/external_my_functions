@@ -564,8 +564,12 @@ plot_d_or_r_tip_point = function(sample,tree,details,donor_ID,recip_ID,cols=c("d
 }
 
 plot_category_tip_point = function(sample_ID,tree,details=NULL,cat_df,cat_name="cat",cols=RColorBrewer::brewer.pal(8,"Set1"),col="black",...) {
-  cols=cols[1:length(cat_df%>%pull(cat_name)%>%unique())]
-  names(cols)<-cat_df%>%pull(cat_name)%>%unique()
+  all_categories<-cat_df%>%pull(cat_name)%>%unique()
+  
+  if(!all(all_categories%in%names(cols))) {
+    cols=cols[1:length(cat_df%>%pull(cat_name)%>%unique())]
+    names(cols)<-sort(all_categories)
+  }
   
   node=which(tree$tip.label==sample_ID)
   info=get_edge_info(tree,details,node)

@@ -121,9 +121,9 @@ plot_tree=function(tree,direction="down",cex.label=5,offset=0,plot_axis=T,title=
     }else{
       tipcol=tree$tip.color
     }
-    #if(cex.label>0){
-    #text(tree$tip.label,y =top-(coords$a1[idx.tip]+offset) ,x=coords$b1[idx.tip],cex = cex.label,pos = 1,col=tipcol)
-    # }
+    if(cex.label>0){
+    text(tree$tip.label,y =top-(coords$a1[idx.tip]+offset) ,x=coords$b1[idx.tip],cex = cex.label,pos = 1,srt=270,col=tipcol)
+    }
     if(cex.terminal.dots>0){
       points(y =top-(coords$a1[idx.tip]) ,x=coords$b1[idx.tip],col=c("darkgrey", "blueviolet","deeppink")[Y_loss], cex=cex.terminal.dots,pch=15)
     }
