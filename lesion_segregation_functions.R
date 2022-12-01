@@ -931,11 +931,21 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     project<-project[,c("sample","project")]
     colnames(project)<-c("sample","project")
     sex=NA
+<<<<<<< HEAD
   } else if(dataset=="MSC_chemo"){
   tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_a_j_vaf_post_mix.tree")
 	  filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_a_j_vaf_post_mix")
 	  project=1805
   sex="female"
+=======
+  } else if(dataset=="DK"){
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_vaf_post_mix.tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_vaf_post_mix")
+    project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/SN/Samples_project_ref_DK.csv",header=T)
+    project<-project[,c("Sample","Project")]
+    colnames(project)<-c("sample","project")
+    sex=NA
+>>>>>>> 8ec436cd4b65b283a89c33c7e9ebe3ff2dc50be8
   }
   return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project,sex=sex))
 }
