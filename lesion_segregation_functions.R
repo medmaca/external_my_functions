@@ -86,6 +86,7 @@ create_PVV_filter_table=function(mutations_to_test,details,tree,matrices,look_ba
       negative_clades=all_clades[unlist(select)]
       if(remove_duplicates) {negative_clades=negative_clades[!negative_clades%in%duplicate_samples]}
       negative_clade_nodes=lapply(negative_clades,function(node) c(node,get_all_node_children(node,tree)))
+      #negative_clade_nodes<-negative_clade_nodes[-which(sapply(negative_clade_nodes,function(x) all(x==which(tree$tip.label=="Ancestral"))))]
       negative_clade_samples=lapply(negative_clade_nodes,function(nodes) return(tree$tip.label[nodes[nodes%in%1:length(tree$tip.label)]]))
       NV_neg=unlist(lapply(negative_clade_samples,function(samples) sum(matrices$NV[mut,samples])))
       NR_neg=unlist(lapply(negative_clade_samples,function(samples) sum(matrices$NR[mut,samples])))
@@ -647,6 +648,7 @@ check_matching_phasing=function(phasing_info1,phasing_info2,het_positions=NULL) 
       vec_no_NAs<-vec[!is.na(vec)]
         if(length(unique(vec_no_NAs))>1) { #If there is disagreement between different SNPs, retain the highest depth ones only
           vec_no_NAs<-vec_no_NAs[as.character(which(comb_df$depth>median(comb_df$depth)))]
+      vec_no_NAs<-vec_no_NAs[!is.na(vec_no_NAs)]
           }
         return(vec_no_NAs)
     })
@@ -875,13 +877,20 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     colnames(project)<-c("sample","project")
     sex=NA
   } else if(dataset=="EM") {
-    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_standard_rho01.tree")
-    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_standard_rho01")
-    project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/EM/Samples_project_ref.csv",header=T)
-    project_ref<-project_ref[,c(1,3)]
-    colnames(project_ref)<-c("sample","project")
-    sample=substr(Sample_ID,1,5)
-    project=as.numeric(project_ref$project[project_ref$sample==sample])
+	  tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_standard_rho01.tree")
+	  filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_standard_rho01")
+	  if(grepl("PD45534|KX004",Sample_ID)) {
+	  project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/EM/KX004_project_reference.csv",header=T)
+	  project<-project[,c("Sample","Project")]
+	  colnames(project)<-c("sample","project")
+	  } else {
+	    project_ref=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/EM/Samples_project_ref.csv",header=T)
+	    project_ref<-project_ref[,c(1,3)]
+	    colnames(project_ref)<-c("sample","project")
+	    sample=substr(Sample_ID,1,5)
+	    project=as.numeric(project_ref$project[project_ref$sample==sample])
+    }
+
     sex=NA
   } else if(dataset=="KY") {
     tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/",Sample_ID,"_rmix_consense_tree_no_branch_lengths_1811.tree") 
@@ -890,8 +899,8 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     project=as.numeric(project_ref$project[project_ref$sample==Sample_ID])
     sex=NA
   } else if(dataset=="MSC_BMT") {
-    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_pval_post_mix.tree")
-    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_pval_post_mix")
+    tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_a_j_pval_post_mix.tree")
+    filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_a_j_pval_post_mix")
     project=read.csv("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/MSC_BMT/Samples_project_reference.csv",header=T)
     project<-project[,c("Sample","Project")]
     colnames(project)<-c("sample","project")
@@ -922,6 +931,11 @@ get_file_paths_and_project=function(dataset,Sample_ID) {
     project<-project[,c("sample","project")]
     colnames(project)<-c("sample","project")
     sex=NA
+  } else if(dataset=="MSC_chemo"){
+  tree_file_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/tree_",Sample_ID,"_m40_postMS_reduced_a_j_vaf_post_mix.tree")
+	  filtered_muts_path=paste0("/lustre/scratch119/casm/team154pc/ms56/lesion_segregation/input_data/",dataset,"/annotated_mut_set_",Sample_ID,"_m40_postMS_reduced_a_j_vaf_post_mix")
+	  project=1805
+  sex="female"
   }
   return(list(tree_file_path=tree_file_path,filtered_muts_path=filtered_muts_path,project=project,sex=sex))
 }
