@@ -597,7 +597,8 @@ check_for_false_germline_calls = function(tree,
                                           COMB_mats,
                                           filter_params,
                                           max_clade_prop=0.1, #the cutoff size (proportion of total samples included in clade) to test the clade for absent germline mutations. At >10% the germline filter is unlikely to wrongly remove mutations.
-                                          SNVs_only=T #Only re-add SNVs (indels are likely to be high frequency artefacts)
+                                          SNVs_only=T, #Only re-add SNVs (indels are likely to be high frequency artefacts)
+                                          CN_table=NULL
 ) {
   #Pull out the root clades
   get_root_clades=function(tree) {
@@ -626,6 +627,25 @@ check_for_false_germline_calls = function(tree,
       #Select mutations that were filtered by the germline filter
       germline_filtered=rownames(filter_params)[log10(filter_params$germline_pval)>(-10)]
       
+      cat(paste("initially there are",length(germline_filtered),"germline filtered mutations"),sep="\n")
+      #Exclude those that are subject to a deletion/ LOH in any of the outlier sample group
+      if(!is.null(CN_table)){
+        CN_table_restricted<-CN_table[CN_table$Sample%in%outlier_sample_group & CN_table$Type%in%c("LOH","DEL"),]
+        if(nrow(CN_table_restricted)>0){
+          cat(paste("Excluding mutations at copy number sites in group",paste(outlier_sample_group,collapse=" ")),sep="\n")
+          for(k in 1:nrow(CN_table_restricted)){
+            muts_df=data.frame(mut_ref=germline_filtered)
+            muts_df$Chrom=str_split(germline_filtered,pattern = "-",simplify = T)[,1]
+            muts_df$Pos=as.integer(str_split(germline_filtered,pattern = "-",simplify = T)[,2])
+            exclude<-(muts_df$Chrom==CN_table_restricted$Chrom[k] & muts_df$Pos>CN_table_restricted$Pos_min[k] & muts_df$Pos<CN_table_restricted$Pos_max[k])
+            print(sum(exclude))
+            cat(germline_filtered[exclude],sep = "\n")
+            germline_filtered<-germline_filtered[!exclude]
+          }
+        }
+      }
+      cat(paste("After filtering there are",length(germline_filtered),"germline filtered mutations"),sep="\n")
+ 
       #Aggregate counts across an individual outlier sample/ sample group
       NR_outlier=apply(COMB_mats$NR[germline_filtered,outlier_sample_group,drop=F],1,sum)
       NV_outlier=apply(COMB_mats$NV[germline_filtered,outlier_sample_group,drop=F],1,sum)
