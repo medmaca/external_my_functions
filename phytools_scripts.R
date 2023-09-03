@@ -221,4 +221,11 @@ amovapval.fn <- function(distmat, groupnames, cell_key, iterations, plottitle) {
   legend("topright", legend=paste0("Observed\n p = ", signif(pval,digits=2)), lwd=2, col="red", bty="n")
 }
 
-
+##One of my functions to calculate Sackin's index across the tree
+calculate_Sackins_Index=function(tree) {
+  tree<-drop.tip(tree,tip="Ancestral")
+  n_internal_nodes<-sapply(1:length(tree$tip.label),function(tip) {
+    length(get_ancestral_nodes(node = tip,edge=tree$edge,exclude_root = T)[-1])
+  })
+  sum(n_internal_nodes)
+}
