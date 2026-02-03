@@ -284,7 +284,7 @@ get_ancestral_nodes= function(node,edge,exclude_root=TRUE){
 #Function to extract the node counts from mutations on a given branch, for a given sample
 #Divides counts into auto & XY mutations, and returns as a df
 get_node_read_counts=function(node,sample,tree,details,matrices,exclude_mut_indexes=NULL) {
-  info=get_edge_info(tree.multi,details,node)
+  info=get_edge_info(tree,details,node)
   
   #Exclude mutations from a branch if they match those given
   if(!is.null(exclude_mut_indexes)) {

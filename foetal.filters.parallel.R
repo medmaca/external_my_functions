@@ -16,7 +16,7 @@ pval_matrix = function(COMB_mats) {
   if(COMB_mats$gender == "male") {
     for(i in 1:nrow(COMB_mats$NV)) {
     for (j in 1:ncol(COMB_mats$NR)) {
-      if (!COMB_mats$mat$Chrom[i] %in% c("X","Y")) {pval_mat[i,j] <- binom.test(COMB_mats$NV[i,j], COMB_mats$NR[i,j], p = 0.5, alternative = "less")$p.value}
+      if (!COMB_mats$mat$Chrom[i] %in% c("chrX","chrY","X","Y")) {pval_mat[i,j] <- binom.test(COMB_mats$NV[i,j], COMB_mats$NR[i,j], p = 0.5, alternative = "less")$p.value}
       else {pval_mat[i,j] <- binom.test(COMB_mats$NV[i,j], COMB_mats$NR[i,j], p = 0.95, alternative = "less")$p.value}
     }
     if (i %% 1000 == 0) {print(i)}
@@ -36,7 +36,7 @@ pval_matrix = function(COMB_mats) {
 #mat object needs the Chrom column with chromosome.  Returns the pval vector for each mutation.
 germline.binomial.filter = function(COMB_mats){
   cat("Starting the germline binomial filter\n")
-  XY_chromosomal = COMB_mats$mat$Chrom %in% c("X","Y")
+  XY_chromosomal = COMB_mats$mat$Chrom %in% c("chrX","chrY","X","Y")
   autosomal = !XY_chromosomal
   
   if(COMB_mats$gender=="female"){
@@ -132,7 +132,7 @@ low_vaf_in_pos_samples_dp2 = function(COMB_mats, define_pos = 2) {
       if(any(NV_vec >= define_pos)){
         NV_vec_pos <- NV_vec[which(NV_vec >= define_pos)]
         NR_vec_pos <- NR_vec[which(NV_vec >= define_pos)]
-        if (COMB_mats$mat$Chrom[k] %in% c("X","Y")) {
+        if (COMB_mats$mat$Chrom[k] %in% c("chrX","chrY","X","Y")) {
           pval[k] <- binom.test(sum(NV_vec_pos), sum(NR_vec_pos), p = 0.95, alt = "less")$p.value
         }
         else {
@@ -169,7 +169,7 @@ low_vaf_in_pos_samples_dp3 = function(COMB_mats, define_pos = 3) {
       if(any(NV_vec >= define_pos)){
         NV_vec_pos <- NV_vec[which(NV_vec >= define_pos)]
         NR_vec_pos <- NR_vec[which(NV_vec >= define_pos)]
-        if (COMB_mats$mat$Chrom[k] %in% c("X","Y")) {
+        if (COMB_mats$mat$Chrom[k] %in% c("chrX","chrY","X","Y")) {
           pval[k] <- binom.test(sum(NV_vec_pos), sum(NR_vec_pos), p = 0.95, alt = "less")$p.value
         }
         else {
@@ -203,7 +203,7 @@ get_mean_depth = function(COMB_mats) {
 get_max_depth_in_pos = function(COMB_mats) {
   cat("Starting the max_depth_in_pos filter\n")
   apply_max_depth_in_pos = function(i, mat_list) {
-    if(!mat_list$mat$Chrom[i] %in% c("X","Y") | COMB_mats$gender == "female") {
+    if(!mat_list$mat$Chrom[i] %in% c("chrX","chrY","X","Y") | COMB_mats$gender == "female") {
       max_depth_in_pos_samples <- max(mat_list$NR[i,which(mat_list$NV[i,]>=min_variant_reads_auto)])
     } else {
       max_depth_in_pos_samples <- max(mat_list$NR[i,which(mat_list$NV[i,]>=min_variant_reads_xy)])
@@ -218,7 +218,7 @@ get_max_depth_in_pos = function(COMB_mats) {
 get_max_pval_in_pos = function(COMB_mats) {
   apply_max_pval_in_pos = function(i, COMB_mats) {
     if(COMB_mats$gender == "male") {
-      if(!COMB_mats$mat$Chrom[i] %in% c("X","Y")) {
+      if(!COMB_mats$mat$Chrom[i] %in% c("chrX","chrY","X","Y")) {
         max_pval_in_pos_samples <- max(COMB_mats$PVal[i,which(COMB_mats$NV[i,]>=min_variant_reads_auto)])
       } else {
         max_pval_in_pos_samples <- max(COMB_mats$PVal[i,which(COMB_mats$NV[i,]>=min_variant_reads_xy)])
@@ -255,7 +255,7 @@ remove_low_coverage_samples = function(COMB_mats,
     COMB_mats$NR <- COMB_mats$NR[,-remove_cols]
     COMB_mats$PVal <- COMB_mats$PVal[,-remove_cols]
     
-    null_remove = rowSums(COMB_mats$NV >= min_variant_reads_auto|(COMB_mats$NV >= min_variant_reads_xy & COMB_mats$mat$Chrom %in% c("X","Y") & COMB_mats$gender == "male")) == 0
+    null_remove = rowSums(COMB_mats$NV >= min_variant_reads_auto|(COMB_mats$NV >= min_variant_reads_xy & COMB_mats$mat$Chrom %in% c("chrX","chrY","X","Y") & COMB_mats$gender == "male")) == 0
     cat(sum(null_remove),"mutations removed as no positives in any remaining samples.\n")
     COMB_mats = list_subset(COMB_mats, select_vector = !null_remove)
     if(!is.null(filter_params)) {
@@ -278,7 +278,7 @@ remove_low_coverage_samples = function(COMB_mats,
 #Functions for filtering from the filter_params and COMB_mats object, setting the desired cut-offs
 assess_mean_depth = function(i, COMB_mats, AUTO_low_depth_cutoff, AUTO_high_depth_cutoff, XY_low_depth_cutoff, XY_high_depth_cutoff) {
   if(COMB_mats$gender == "male") {
-    if(!COMB_mats$mat$Chrom[i] %in% c("X","Y")) {
+    if(!COMB_mats$mat$Chrom[i] %in% c("chrX","chrY","X","Y")) {
       ifelse((filter_params$mean_depth[i] >= AUTO_low_depth_cutoff & filter_params$mean_depth[i] <= AUTO_high_depth_cutoff), 1,0)
     } else {
       ifelse(filter_params$mean_depth[i] >= XY_low_depth_cutoff & filter_params$mean_depth[i] <= XY_high_depth_cutoff, 1,0)
@@ -290,7 +290,7 @@ assess_mean_depth = function(i, COMB_mats, AUTO_low_depth_cutoff, AUTO_high_dept
 
 assess_max_depth_in_pos = function(i, COMB_mats, min_depth_auto, min_depth_xy) {
   if(COMB_mats$gender == "male") {
-    if(!COMB_mats$mat$Chrom[i] %in% c("X","Y")) {
+    if(!COMB_mats$mat$Chrom[i] %in% c("chrX","chrY","X","Y")) {
       ifelse(filter_params$max_depth_in_pos_samples[i] >= min_depth_auto, 1,0)
     } else {
       ifelse(filter_params$max_depth_in_pos_samples[i] >= min_depth_xy, 1,0)
@@ -302,7 +302,7 @@ assess_max_depth_in_pos = function(i, COMB_mats, min_depth_auto, min_depth_xy) {
 
 assess_max_vaf = function(i, COMB_mats, min_vaf_auto, min_vaf_xy) {
   if(COMB_mats$gender == "male") {
-    if(!COMB_mats$mat$Chrom[i] %in% c("X","Y")) {
+    if(!COMB_mats$mat$Chrom[i] %in% c("chrX","chrY","X","Y")) {
       ifelse(filter_params$max_mut_vaf[i] >= min_vaf_auto, 1,0)
     } else {
       ifelse(filter_params$max_mut_vaf[i] >= min_vaf_xy, 1,0)
@@ -410,7 +410,7 @@ get_filtered_mut_set = function(input_set_ID,
     min_vaf_mat <- COMB_mats.tree.build$NV/depth_no_zero > min_vaf_SHARED[1]
   } else if(!is.na(min_vaf_SHARED) & gender == "male") {
     min_vaf_mat = matrix(0, ncol = ncol(COMB_mats.tree.build$NV), nrow = nrow(COMB_mats.tree.build$NV))
-    xy_muts = COMB_mats.tree.build$mat$Chrom %in% c("X","Y")
+    xy_muts = COMB_mats.tree.build$mat$Chrom %in% c("chrX","chrY","X","Y")
     depth_no_zero = COMB_mats.tree.build$NR
     depth_no_zero[depth_no_zero == 0] <- 1
     min_vaf_mat[xy_muts,] <- COMB_mats.tree.build$NV[xy_muts,]/depth_no_zero[xy_muts,] > min_vaf_SHARED[2]
@@ -511,7 +511,7 @@ get_early_nodes = function(tree,divisions=2) {
 #Function to calculate peak VAFs from sample mutations (after applying germline and beta-binomial filters) to screen for mixed colonies
 check_peak_vaf = function(sample, COMB_mats, filter_params,rho_cutoff=0.3) {
   colnames(COMB_mats$NV) <- gsub(pattern = "_MTR", replacement = "",x = colnames(COMB_mats$NV))
-  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > rho_cutoff ,sample])
+  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("chrX","chrY","X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > rho_cutoff ,sample])
   return(dens$x[which.max(dens$y)])
 }
 
@@ -519,7 +519,7 @@ check_peak_vaf = function(sample, COMB_mats, filter_params,rho_cutoff=0.3) {
 vaf_density_plot = function(sample, COMB_mats, filter_params,rho_cutoff=0.3) {
   colnames(COMB_mats$NV)=colnames(COMB_mats$NR)=gsub(pattern = "_MTR", replacement = "",x = colnames(COMB_mats$NV))
   sample_mean_depth = mean(COMB_mats$NR[,sample])
-  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > rho_cutoff ,sample])
+  dens <- density((COMB_mats$NV/COMB_mats$NR)[COMB_mats$NV[,sample] >=2 & !COMB_mats$mat$Chrom %in% c("chrX","chrY","X","Y") & log10(filter_params$germline_pval) <(-10) & filter_params$bb_rhoval > rho_cutoff ,sample])
   plot(dens, main = sample,xlim=c(-0.05,1.05))
   abline(v = dens$x[which.max(dens$y)])
   text(0.7, max(dens$y) - 0.2, paste("Peak VAF dens=",round(dens$x[which.max(dens$y)], digits = 2),"\nMean coverage=",round(sample_mean_depth,digits =2)), col = "red", cex = 0.7)

@@ -1345,3 +1345,31 @@ count_internal_nodes=function(tree,cut_off=50){
   internal_nodes_above_cutoff=sum(nodeheights[,2]>cut_off & !tree$edge[,2]%in%1:length(tree$tip.label))
   return(internal_nodes_above_cutoff)
 }
+
+#Adjust the add_heatmap function to more easily add the heatmaps for the PVVs/ MAVs
+add_mut_heatmap=function(tree,heatmap,heatvals=NULL,border="white",heatmap_bar_height=0.05,cex.label=2,label.cols=NA){
+  ymax=tree$ymax
+  idx=match(colnames(heatmap),tree$tip.label)
+  top=-0.01*ymax
+  gap=tree$vspace.reserve/dim(heatmap)[1]
+  labels=rownames(heatmap)
+  for(i in 1:dim(heatmap)[1]){
+    bot=top-heatmap_bar_height*ymax
+    #bot=top-(0.05/dim(heatmap)[1])*ymax
+    rect(xleft=idx-0.5,xright=idx+0.5,ybottom = bot,ytop=top,col = heatmap[i,],border=border,lwd = 0.25)
+    if(!is.null(heatvals)){
+      text(xx=idx,y=0.5*(top+bot),labels = sprintf("%3.2f",heatvals[i,]))
+    }
+    if(!is.null(labels)){
+      if(!is.na(label.cols[1])) {
+        text(labels[i],x=0.5,y=0.5*(top+bot),pos = 2,cex = cex.label,col=label.cols[i])
+      } else {
+        text(labels[i],x=0.5,y=0.5*(top+bot),pos = 2,cex = cex.label)
+      }
+      
+    }
+    top=bot
+  }
+  tree
+}
+
